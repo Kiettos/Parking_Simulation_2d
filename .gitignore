@@ -1,0 +1,4 @@
+.venv311/
+.venv/
+mapark/__pycache__/
+render2d/__pycache__/
