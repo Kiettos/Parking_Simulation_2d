@@ -1,0 +1,55 @@
+{
+  "maps": [
+    {
+      "name": "VuongGoc",
+      "displayName": "Dạng 1 — Vuông góc 21x21 (Viền chữ U)",
+      "cellSize": 6.0,
+      "tiles": [
+        "GGGGGGGGGGGGGGGGGGGGG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCPPPPPCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCPPPPPCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "HCCCCCCCCCCCCCCCCCCCH",
+        "RRRRRRRRRRRRRRRRRRRRR"
+      ],
+      "objects": [
+        "BBBBBBBBBBBBBBBBBBBBB",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "L-------------------L",
+        "---------------------"
+      ]
+    }
+  ]
+}

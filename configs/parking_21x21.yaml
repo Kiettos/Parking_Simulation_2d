@@ -1,0 +1,45 @@
+# Map 21x21 nạp từ JSON: 840 x 840 px, 10 slot đỗ, vật cản tĩnh
+map: maps/parking_21x21.json
+
+training:
+  n_envs: 4
+  total_timesteps: 500000
+  max_steps: 400
+  dt: 0.15
+
+  # 5 xe decoy, chỉ spawn sau khi đỗ thành công đầu tiên;
+  # đủ 20 success thì đổi layout decoy (spawn lại ngẫu nhiên).
+  decoy_count: 5
+  decoy_seed: 7
+  decoy_success_target: 20
+
+  # Mỗi episode chọn ngẫu nhiên 1 slot trống làm đích
+  random_target_slot: true
+
+  # Điều kiện "đỗ thành công đúng hướng"
+  success_dist: 15.0
+  success_theta_deg: 20.0
+
+  # Random hoá vị trí xuất phát (dx, dy, dtheta)
+  start_jitter: [30.0, 30.0, 0.3]
+
+  # In mean/std reward mỗi 10k step
+  log_every_steps: 10000
+
+  # Bỏ trống target_return = không dừng sớm; train đến total_timesteps.
+  # target_return: 180.0
+  # target_window: 100
+  # extra_episodes: 100
+
+  model_out: models/ppo_park_21x21
+
+ppo:
+  learning_rate: 0.0003
+  n_steps: 2048
+  batch_size: 256
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  net_arch: [64, 64]

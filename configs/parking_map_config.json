@@ -1,0 +1,133 @@
+{
+  "tileSize": 60,
+  "objectSize": 30,
+  "agent": {
+    "width": 18.4,
+    "length": 43.6,
+    "color": "#0d47a1"
+  },
+  "legend": {
+    "tiles": {
+      "C": {
+        "name": "casual_tile",
+        "size": [
+          60,
+          60
+        ],
+        "color": "#9e9e9e",
+        "walkable": true
+      },
+      "G": {
+        "name": "planting_tile",
+        "size": [
+          60,
+          60
+        ],
+        "color": "#795548",
+        "walkable": false
+      },
+      "H": {
+        "name": "sidewalk",
+        "size": [
+          60,
+          60
+        ],
+        "color": "#fbc02d",
+        "walkable": false
+      },
+      "R": {
+        "name": "road",
+        "size": [
+          60,
+          60
+        ],
+        "color": "#37474f",
+        "walkable": true
+      },
+      "P": {
+        "name": "parking_tile",
+        "size": [
+          60,
+          60
+        ],
+        "color": "#455a64",
+        "strokeColor": "#ffffff",
+        "walkable": true,
+        "isGoal": true
+      }
+    },
+    "objects": {
+      "B": {
+        "name": "bush",
+        "size": [
+          30,
+          30
+        ],
+        "color": "#1976d2",
+        "isObstacle": true
+      },
+      "L": {
+        "name": "lamp",
+        "size": [
+          30,
+          30
+        ],
+        "color": "#00e5ff",
+        "isObstacle": true
+      }
+    }
+  },
+  "maps": [
+    {
+      "name": "VuongGoc",
+      "displayName": "Dạng 1 — Vuông góc 21x21 (Viền chữ U)",
+      "cellSize": 6.0,
+      "tiles": [
+        "GGGGGGGGGGGGGGGGGGGGG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCPPPPPCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCPPPPPCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "GCCCCCCCCCCCCCCCCCCCG",
+        "HCCCCCCCCCCCCCCCCCCCH",
+        "RRRRRRRRRRRRRRRRRRRRR"
+      ],
+      "objects": [
+        "BBBBBBBBBBBBBBBBBBBBB",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "B-------------------B",
+        "L-------------------L",
+        "---------------------"
+      ]
+    }
+  ]
+}

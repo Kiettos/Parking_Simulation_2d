@@ -1,0 +1,8 @@
+-Default
+    +Car spawn point and size
+    +Obstacle spawn point and size
+    +World Size (screen size)
+    +Slots (parking slot)
+
+
+-

@@ -1,0 +1,31 @@
+{
+  "maps": [
+    {
+      "name": "VuongGoc",
+      "displayName": "Dạng 1 — Vuông góc 9x9 (Viền chữ U)",
+      "cellSize": 6.0,
+      "tiles": [
+        "GGGGGGGGG",
+        "GCCCCCCCG",
+        "GCPPCPPCG",
+        "GCCCCCCCG",
+        "GCCCCCCCG",
+        "GCPPCPPCG",
+        "GCPPCPPCG",
+        "HCCCCCCCH",
+        "RRRRRRRRR"
+      ],
+      "objects": [
+        "BBBBBBBBB",
+        "B-------B",
+        "B-------B",
+        "B-------B",
+        "B-------B",
+        "B-------B",
+        "B-------B",
+        "L-------L",
+        "---------"
+      ]
+    }
+  ]
+}

@@ -1,8 +1,8 @@
+import argparse
 import sys
 from pathlib import Path
 
 import pygame
-import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -11,27 +11,51 @@ from stable_baselines3 import PPO
 
 from mapark.rl_env import ParkingEnv
 from mapark.sensors import sense_all
+from mapark.tile_map import build_runtime_config
 from render2d.app import draw_world
 
 
 def main():
-    with (ROOT / "configs" / "default.yaml").open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    parser = argparse.ArgumentParser(description="Run a trained PPO agent")
+    parser.add_argument(
+        "--map-config",
+        default="configs/parking_map_config.json",
+        help="Tile/object/agent config JSON",
+    )
+    parser.add_argument(
+        "--map",
+        default="configs/maps.json",
+        help="Map JSON (21x21 tiles/objects)",
+    )
+    parser.add_argument("--map-name", default=None, help="Map name in JSON")
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Path to model .zip (default: training.model_out)",
+    )
+    args = parser.parse_args()
+
+    cfg = build_runtime_config(args.map_config, args.map, args.map_name)
+    tr = cfg["training"]
+    model_path = Path(args.model or tr.get("model_out", "models/ppo_park_tiles"))
+    if not model_path.is_absolute():
+        model_path = ROOT / model_path
 
     env = ParkingEnv(cfg)
-    model = PPO.load(str(ROOT / "models" / "ppo_park_final"))
+    model = PPO.load(str(model_path), device="cpu")
 
     pygame.init()
     screen = pygame.display.set_mode(
         (int(env.world.width), int(env.world.height))
     )
-    pygame.display.set_caption("ParkSim2D — PPO agent")
+    pygame.display.set_caption(f"ParkSim2D — PPO ({model_path.name})")
     font = pygame.font.SysFont("consolas", 16)
     clock = pygame.time.Clock()
 
-    obs, _ = env.reset()
+    obs, info = env.reset()
     total_reward = 0.0
     status = "Running"
+    last_result = ""
 
     running = True
     while running:
@@ -42,32 +66,46 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_r:
-                    obs, _ = env.reset()
+                    obs, info = env.reset()
                     total_reward = 0.0
                     status = "Reset"
+                    last_result = ""
 
         action, _ = model.predict(obs, deterministic=True)
-        obs, reward, terminated, truncated, _ = env.step(int(action))
+        obs, reward, terminated, truncated, info = env.step(int(action))
         total_reward += reward
 
-        env.world.sensors = sense_all(env.world, env.car, max_range=180.0)
+        env.world.sensors = sense_all(
+            env.world, env.car, max_range=env.sensor_range
+        )
         draw_world(screen, env.world)
 
-        hud1 = font.render(f"reward={total_reward:.2f}  {status}", True, (30, 30, 30))
+        hud1 = font.render(
+            f"reward={total_reward:.2f}  slot={info.get('target_slot')}"
+            f"  ep={info.get('episode_index')}  layout={info.get('layout_index')}"
+            f"  layout_succ={info.get('layout_successes')}"
+            f"  total_succ={info.get('total_successes')}",
+            True,
+            (30, 30, 30),
+        )
         screen.blit(hud1, (10, 10))
+        hud2 = font.render(f"{status}  {last_result}", True, (30, 30, 30))
+        screen.blit(hud2, (10, 30))
         pygame.display.flip()
-        clock.tick(30)   # hiện tại 8; chậm lại để quan sát
+        clock.tick(30)
 
         if terminated or truncated:
-            if reward >= 100:
-                status = "PARKED ✓"
-            elif reward <= -5:
+            if info.get("is_success"):
+                status = "PARKED"
+            elif info.get("is_collision"):
                 status = "COLLIDED"
             else:
                 status = "Timeout"
-            pygame.time.wait(1000)
-            obs, _ = env.reset()
+            last_result = f"return={total_reward:.1f}"
+            pygame.time.wait(700)
+            obs, info = env.reset()
             total_reward = 0.0
+            status = "Running"
 
     pygame.quit()
 
