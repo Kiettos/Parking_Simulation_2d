@@ -44,13 +44,11 @@ class ParkingEnv(gym.Env):
         if self.num_slots == 0:
             raise ValueError("Map cần ít nhất một slot đỗ")
 
-        # --- Decoy: spawn point / target / decoy đều CHỈ đổi sau khi đạt
-        #     `decoy_success_target` (mặc định 20) lần đỗ thành công ---
+        # --- Xe decoy: chỉ spawn sau khi đỗ thành công, rồi đổi layout sau
+        #     `decoy_success_target` lần đỗ thành công (mặc định 20) ---
         self.decoy_count = int(self.train_cfg.get("decoy_count", 0))
         self.decoy_seed = int(self.train_cfg.get("decoy_seed", 0))
         self.decoy_success_target = max(1, int(self.train_cfg.get("decoy_success_target", 20)))
-        # có sẵn decoy ngay episode đầu (không cần chờ success đầu tiên)
-        self.decoy_on_reset = bool(self.train_cfg.get("decoy_on_reset", False))
         # luôn chừa ít nhất 1 slot trống làm đích
         self.decoy_count = max(0, min(self.decoy_count, self.num_slots - 1))
 
@@ -64,17 +62,12 @@ class ParkingEnv(gym.Env):
         jitter = self.train_cfg.get("start_jitter", [30.0, 30.0, 0.3])
         self.start_jitter = (float(jitter[0]), float(jitter[1]), float(jitter[2]))
 
-        # Spawn point / target chỉ đổi khi _layout_changed() == True.
-        self.random_start_pose = bool(self.train_cfg.get("random_start_pose", True))
-
         # Map mới: đích ngẫu nhiên trong các slot trống.
         # Config kiểu cũ: giữ slot 0 để không phá model đã train trước đây.
         default_random_target = "map" in config
         self.random_target_slot = bool(
             self.train_cfg.get("random_target_slot", default_random_target)
         )
-        self._locked_target_index = 0
-        self._locked_car_pose = None
 
         self.episode_index = 0
         self.target_index = 0
@@ -84,6 +77,7 @@ class ParkingEnv(gym.Env):
         self.layout_successes = 0
         self.total_successes = 0
         self._pending_decoy_spawn = False
+
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(13,), dtype=np.float32
         )
@@ -155,23 +149,35 @@ class ParkingEnv(gym.Env):
         self.decoy_slots = ids
 
     def force_decoy_layout(self):
-        """Đổi layout ngay ở lần reset kế tiếp (dùng cho demo/eval)."""
+        """Bật decoy ngay ở lần reset kế tiếp (dùng cho demo/eval)."""
+        self.decoy_spawned = True
         self._pending_decoy_spawn = True
 
     def _on_success(self, info):
-        """Cộng success; đủ `decoy_success_target` lần thì đổi layout.
+        """Cập nhật bộ đếm success và quyết định spawn/đổi layout decoy.
 
-        Layout gồm: decoy + spawn point + target. Chỉ khi đủ ngưỡng mới
-        đặt `_pending_decoy_spawn = True` -> episode kế tiếp random lại.
+        - Success đầu tiên: spawn decoy ở episode kế tiếp.
+        - Sau đó: đủ `decoy_success_target` success thì đổi layout decoy.
         """
         self.total_successes += 1
-        self.layout_successes += 1
 
-        if self.layout_successes >= self.decoy_success_target:
-            info["decoy_event"] = "respawn"
-            info["layout_completed"] = True
-            info["completed_successes"] = self.layout_successes
+        if self.decoy_count <= 0:
+            info["total_successes"] = self.total_successes
+            info["decoy_spawned"] = False
+            return
+
+        if not self.decoy_spawned:
+            self.decoy_spawned = True
+            self.layout_successes = 0
             self._pending_decoy_spawn = True
+            info["decoy_event"] = "spawn"
+        else:
+            self.layout_successes += 1
+            if self.layout_successes >= self.decoy_success_target:
+                info["decoy_event"] = "respawn"
+                info["layout_completed"] = True
+                info["completed_successes"] = self.layout_successes
+                self._pending_decoy_spawn = True
 
         info["layout_index"] = self.layout_index
         info["layout_successes"] = self.layout_successes
@@ -217,8 +223,7 @@ class ParkingEnv(gym.Env):
         ]
         return np.array(obs, dtype=np.float32)
 
-    def _draw_car_pose(self):
-        """Random 1 pose xuất phát (jitter quanh start_pose), không đè vật cản."""
+    def _spawn_car(self):
         base_x, base_y, base_theta = self.start_pose
         jx, jy, jt = self.start_jitter
         for _ in range(30):
@@ -227,17 +232,9 @@ class ParkingEnv(gym.Env):
             theta = base_theta + float(self.np_random.uniform(-jt, jt))
             self.car.commit((x, y, theta, 0.0, 0.0))
             if not self.world.car_collides(self.car.obb()):
-                return (x, y, theta)
+                return
         # fallback: đúng vị trí gốc
         self.car.commit((base_x, base_y, base_theta, 0.0, 0.0))
-        return (base_x, base_y, base_theta)
-
-    def _spawn_car(self):
-        """Đặt xe vào pose đã khoá của layout; chỉ random lại khi có reset"""
-        if self._locked_car_pose is None:
-            self._locked_car_pose = self._draw_car_pose()
-        x, y, theta = self._locked_car_pose
-        self.car.commit((x, y, theta, 0.0, 0.0))
 
     def _pick_target_slot(self):
         if not self.random_target_slot:
@@ -248,63 +245,23 @@ class ParkingEnv(gym.Env):
         free = self.world.free_slot_indices()
         if not free:
             free = list(range(self.num_slots))
-        # "chỉ thay đổi target": ưu tiên slot khác slot đã khoá
+        # "chỉ thay đổi target": ưu tiên slot khác episode trước
         if len(free) > 1:
-            choices = [i for i in free if i != self._locked_target_index]
+            choices = [i for i in free if i != self.target_index]
             if choices:
                 free = choices
         return int(free[int(self.np_random.integers(len(free)))])
-
-    def _lock_target_slot(self):
-        """Giữ nguyên target của layout; chỉ random lại khi có reset."""
-        if (
-            self._locked_target_index is None
-            or self._locked_target_index in self.decoy_slots
-        ):
-            self._locked_target_index = self._pick_target_slot()
-        return self._locked_target_index
-
-    def _reset_layout(self):
-        """Random lại toàn bộ layout: decoy + spawn point + target."""
-        self._locked_car_pose = None
-        self._locked_target_index = None
-
-        self.layout_successes = 0
-        self._pending_decoy_spawn = False
-
-        if self.decoy_count <= 0 or self.num_slots <= 1:
-            self.world.set_decoys([])
-            self.decoy_slots = []
-            self.decoy_spawned = False
-            return
-
-        self.layout_index += 1
-        rng = random.Random(self.decoy_seed * 1_000_003 + self.layout_index)
-        k = min(self.decoy_count, self.num_slots - 1)
-        ids = sorted(rng.sample(range(self.num_slots), k))
-
-        decoys = []
-        for i in ids:
-            slot = self.world.slots[i]
-            # xe decoy đỗ đúng tâm slot, cùng hướng với slot
-            decoys.append(
-                OBB(slot.cx, slot.cy, self.car.length, self.car.width, slot.theta)
-            )
-        self.world.set_decoys(decoys)
-        self.world.decoy_slots = ids
-        self.decoy_slots = ids
-        self.decoy_spawned = True
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         self.episode_index += 1
 
-        # Chỉ random lại decoy / spawn point / target khi đủ ngưỡng success.
-        if self._pending_decoy_spawn or (self.decoy_on_reset and self.layout_index == 0):
-            self._reset_layout()
+        # Layout decoy chỉ đổi SAU khi có success (xem _on_success).
+        if self._pending_decoy_spawn:
+            self._spawn_decoy_layout()
 
         self._spawn_car()
-        self.target_index = self._lock_target_slot()
+        self.target_index = self._pick_target_slot()
         self.world.target_index = self.target_index
 
         slot = self.world.slots[self.target_index]
@@ -332,6 +289,7 @@ class ParkingEnv(gym.Env):
         n_sub = 3
         sub_dt = self.dt / n_sub
         collided = False
+        collided_obb = None
         for _ in range(n_sub):
             v = throttle_dir * self.car.max_speed_fwd * 0.5
             steer = steer_dir * self.car.max_steer
@@ -343,6 +301,7 @@ class ParkingEnv(gym.Env):
             self.car.steer = steer
             if self.world.car_collides(self.car.obb()):
                 collided = True
+                collided_obb = self.car.obb()
                 break
 
         if collided:
@@ -357,9 +316,28 @@ class ParkingEnv(gym.Env):
             ((self.car.theta - slot.theta + math.pi) % (2 * math.pi)) - math.pi
         )
 
-        # Reward shaping
-        reward = -0.02                                    # step penalty
-        reward += 0.05 * (self.prev_dist - dist)          # progress
+        # Bảng phạt chi tiết theo từng loại object & tile cấm
+        COLLISION_PENALTIES = {
+            "decoy": -15.0,
+            "lamp": -15.0,
+            "boundary": -12.0,
+            "bush": -10.0,
+            "planting_tile": -10.0,
+            "sidewalk": -8.0,
+            "obstacle": -10.0,
+        }
+
+        get_tile = getattr(self.world, "get_tile_at", lambda x, y: None)
+        current_tile = get_tile(self.car.x, self.car.y)
+        if current_tile == "R":
+            step_cost = -0.01       # Đường chính
+        elif current_tile == "P":
+            step_cost = -0.01 if dist < 28.0 else -0.15  # Đúng ô đích thì nhẹ, đè ô P khác thì phạt
+        else:
+            step_cost = -0.02       # Sân bãi 'C' hoặc map cũ
+
+        reward = step_cost
+        reward += 0.05 * (self.prev_dist - dist)
         self.prev_dist = dist
 
         terminated = False
@@ -373,12 +351,16 @@ class ParkingEnv(gym.Env):
             "total_successes": self.total_successes,
             "is_success": False,
             "is_collision": False,
+            "collision_type": None,
         }
 
         if collided:
-            reward -= 10.0
+            check_detail = getattr(self.world, "check_collision_detail", lambda obb: None)
+            c_type = check_detail(collided_obb) or "obstacle"
+            reward += COLLISION_PENALTIES.get(c_type, -10.0)
             terminated = True
             info["is_collision"] = True
+            info["collision_type"] = c_type
 
         if dist < self.success_dist and dtheta < self.success_theta and not collided:
             reward += 200.0

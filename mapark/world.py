@@ -4,6 +4,8 @@ from Unimportant.geometry import obb_intersect
 
 class World:
     def __init__(self, width, height):
+        self.tiles_raw = None
+        self.objects_raw = None
         self.width = float(width)
         self.height = float(height)
         self.car = None
@@ -68,3 +70,43 @@ class World:
             car.commit(old)
             car.v = 0.0
         self.sensors = sense_all(self, car)
+
+    def get_tile_at(self, x, y):
+        if not self.tiles_raw or not self.cell_size:
+            return None
+        col = int(x // self.cell_size)
+        row = int(y // self.cell_size)
+        if 0 <= row < len(self.tiles_raw) and 0 <= col < len(self.tiles_raw[row]):
+            return self.tiles_raw[row][col]
+        return None
+
+    def get_object_at(self, x, y):
+        if not self.objects_raw or not self.cell_size:
+            return "-"
+        col = int(x // self.cell_size)
+        row = int(y // self.cell_size)
+        if 0 <= row < len(self.objects_raw) and 0 <= col < len(self.objects_raw[row]):
+            return self.objects_raw[row][col]
+        return "-"
+
+    def check_collision_detail(self, obb):
+        for cx, cy in obb.corners():
+            if cx < 0 or cx > self.width or cy < 0 or cy > self.height:
+                return "boundary"
+        for d in self.decoys:
+            if obb_intersect(obb, d):
+                return "decoy"
+        if self.car_collides(obb):
+            for cx, cy in obb.corners():
+                obj_ch = self.get_object_at(cx, cy)
+                if obj_ch == "L":
+                    return "lamp"
+                if obj_ch == "B":
+                    return "bush"
+                tile_ch = self.get_tile_at(cx, cy)
+                if tile_ch == "H":
+                    return "sidewalk"
+                if tile_ch == "G":
+                    return "planting_tile"
+            return "obstacle"
+        return None
