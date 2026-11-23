@@ -38,6 +38,9 @@ Mô phỏng 2D bài toán xe tự đỗ, gồm 2 hướng tiếp cận:
 # Chạy agent đã train
 .venv311\Scripts\python.exe scripts\play_ppo.py --model models\ppo_park_21x21
 
+# Xuất PPO sang ONNX
+.venv311\Scripts\python.exe scripts\export_onnx.py --model models\ppo_park_final --output models\ppo_park_final.onnx
+
 # Demo Hybrid A* + Pure Pursuit (SPACE = plan, ENTER = follow, D = decoy, R = reset)
 .venv311\Scripts\python.exe scripts\run_demo.py
 

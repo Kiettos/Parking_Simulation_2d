@@ -4,3 +4,5 @@ numpy>=1.26
 gymnasium>=0.29.1
 stable-baselines3>=2.2
 tensorboard>=2.14
+onnx>=1.16
+onnxruntime>=1.18
