@@ -50,15 +50,25 @@ class ParkingEnv(gym.Env):
         if self.num_slots == 0:
             raise ValueError("Map cần ít nhất một slot đỗ")
 
-        # --- Decoy: spawn point / target / decoy đều CHỈ đổi sau khi đạt
-        #     `decoy_success_target` (mặc định 20) lần đỗ thành công ---
+        # --- Decoy ---
+        # `decoy_count`      : số decoy mỗi layout decoy
+        # `decoy_first_count`: số decoy ở lần init ĐẦU (0 = bãi trống)
+        # `decoy_on_reset`   : đặt decoy ngay từ episode 1 (thay vì bãi trống)
         self.decoy_count = int(self.train_cfg.get("decoy_count", 0))
         self.decoy_seed = int(self.train_cfg.get("decoy_seed", 0))
         self.decoy_success_target = max(1, int(self.train_cfg.get("decoy_success_target", 20)))
-        # có sẵn decoy ngay episode đầu (không cần chờ success đầu tiên)
         self.decoy_on_reset = bool(self.train_cfg.get("decoy_on_reset", False))
+        self.decoy_first_count = int(
+            self.train_cfg.get("decoy_first_count", self.decoy_count)
+        )
+        # decoy ép ngay từ init thay vì để bãi trống
+        self.force_hard_start = bool(self.train_cfg.get("force_hard_start", False))
+        if self.force_hard_start:
+            self.decoy_first_count = self.decoy_count
+        self.decoy_first_count = max(0, min(self.decoy_first_count, self.num_slots - 1))
         # luôn chừa ít nhất 1 slot trống làm đích
         self.decoy_count = max(0, min(self.decoy_count, self.num_slots - 1))
+        self.easy_layout_done = False     # đã chạy xong layout bãi trống
 
         self.success_dist = float(self.train_cfg.get("success_dist", 15.0))
         self.success_theta = math.radians(
@@ -480,7 +490,11 @@ class ParkingEnv(gym.Env):
         return self._locked_target_index
 
     def _reset_layout(self):
-        """Mốc 180: random lại toàn bộ layout (decoy + spawn point + target)."""
+        """Random lại toàn bộ layout (decoy + spawn point + target).
+
+        Lần init đầu tiên dùng `decoy_first_count` (mặc định 0 = bãi trống),
+        các lần sau dùng `decoy_count`.
+        """
         self._locked_car_pose = None
         self._locked_target_index = None
         self.layout_target_index = None
@@ -490,15 +504,22 @@ class ParkingEnv(gym.Env):
         self.spawn_level = 0
         self.spawn_base_pose = None
 
-        if self.decoy_count <= 0 or self.num_slots <= 1:
+        first_init = not self.easy_layout_done
+        n_decoy = self.decoy_first_count if first_init else self.decoy_count
+        if first_init:
+            self.easy_layout_done = True
+
+        if n_decoy <= 0 or self.num_slots <= 1:
             self.world.set_decoys([])
+            self.world.decoy_slots = []
             self.decoy_slots = []
             self.decoy_spawned = False
+            self.first_layout_index = self.layout_index
             return
 
         self.layout_index += 1
         rng = random.Random(self.decoy_seed * 1_000_003 + self.layout_index)
-        k = min(self.decoy_count, self.num_slots - 1)
+        k = min(n_decoy, self.num_slots - 1)
         ids = sorted(rng.sample(range(self.num_slots), k))
 
         decoys = []
