@@ -32,13 +32,14 @@ DEFAULT_TRAINING = {
     "sensor_range": 150.0,
     "obs_dist_scale": 890.0,
     # Reward va chạm chung + theo từng loại tile/object
-    "collision_reward": -10.0,
+    # (phải > progress tối đa + success để "đâm tường" luôn tệ hơn đứng yên)
+    "collision_reward": -100.0,
     "collision_rewards": {
-        "tile:G": -10.0,     # planting
-        "tile:H": -10.0,     # sidewalk
-        "object:B": -6.0,    # bush
-        "object:L": -6.0,    # lamp
-        "decoy": -10.0,
+        "tile:G": -100.0,    # planting
+        "tile:H": -100.0,    # sidewalk
+        "object:B": -40.0,   # bush
+        "object:L": -40.0,   # lamp
+        "decoy": -100.0,
     },
     "terminate_on_collision": True,
 
@@ -47,15 +48,17 @@ DEFAULT_TRAINING = {
     "suite_max_speed_to_park": 0.3,  # maxSpeedToPark
     "suite_hold_decisions": 10,      # holdDecisions
     "suite_obs_scale": 15.0,         # obsScale
-    "suite_max_distance": 0.0,       # 0 = tắt (map 2D 630x630 rộng hơn map 3D)
+    "suite_max_distance": 1100.0,    # px; 0 = tắt. Map 630x630, spawn->slot ~1000px
     # Động học kiểu CarController (Box action)
     "use_kinematic": True,
     "brake_decel": 200.0,
     "suite_distance_shaping": 0.05,  # distanceShaping
-    "suite_align_shaping": 0.05,     # alignShaping
+    "suite_align_shaping": 0.02,     # alignShaping (khớp align_shaping)
     "suite_parked_check": True,      # dùng điều kiện đỗ 4-góc + tốc độ + 10°
-    "progress_weight": 0.05,
-    "step_penalty": -0.02,
+    "progress_weight": 0.02,
+    "step_penalty": -0.05,
+    "success_reward": 150.0,
+    "align_shaping": 0.02,
     "start_jitter": [3.0, 3.0, 0.2],
     "max_speed_fwd": 60.0,
     "max_speed_rev": 30.0,
@@ -73,7 +76,7 @@ DEFAULT_PPO = {
     "gamma": 0.99,
     "gae_lambda": 0.95,
     "clip_range": 0.2,
-    "ent_coef": 0.01,
+    "ent_coef": 0.015,
     "net_arch": [64, 64],
 }
 

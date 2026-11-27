@@ -128,8 +128,9 @@ class ParkingEnv(gym.Env):
         self.brake_decel = float(self.train_cfg.get("brake_decel", 200.0))
         self.use_kinematic = bool(self.train_cfg.get("use_kinematic", True))
 
-        self.step_penalty = float(self.train_cfg.get("step_penalty", -0.02))
-        self.progress_weight = float(self.train_cfg.get("progress_weight", 0.05))
+        self.step_penalty = float(self.train_cfg.get("step_penalty", -0.05))
+        self.progress_weight = float(self.train_cfg.get("progress_weight", 0.02))
+        self.success_reward = float(self.train_cfg.get("success_reward", 150.0))
 
         # --- Reward khi va chạm, riêng cho từng loại tile / object ---
         self.collision_reward = float(self.train_cfg.get("collision_reward", -10.0))
@@ -158,7 +159,7 @@ class ParkingEnv(gym.Env):
         self.obs_scale = float(self.train_cfg.get("suite_obs_scale", 15.0))
         self.max_distance = float(self.train_cfg.get("suite_max_distance", 40.0))
         self.distance_shaping = float(self.train_cfg.get("suite_distance_shaping", 0.05))
-        self.align_shaping = float(self.train_cfg.get("suite_align_shaping", 0.05))
+        self.align_shaping = float(self.train_cfg.get("suite_align_shaping", 0.02))
         self.use_suite_parked = bool(self.train_cfg.get("suite_parked_check", True))
         self.parked_count = 0
         self.prev_align = 0.0
@@ -813,7 +814,7 @@ class ParkingEnv(gym.Env):
                 # 3D parity: phải giữ trạng thái đỗ đủ hold_decisions bước
                 self.parked_count += 1
                 if self.parked_count >= self.hold_decisions:
-                    reward += 200.0
+                    reward += self.success_reward
                     terminated = True
                     info["is_success"] = True
                     self._on_success(info)
