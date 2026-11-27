@@ -36,6 +36,21 @@ DEFAULT_TRAINING = {
         "decoy": -10.0,
     },
     "terminate_on_collision": True,
+
+    # --- Đồng bộ với ParkingAgent (Unity 3D) ---
+    "suite_max_angle_deg": 10.0,     # maxAngleDeg
+    "suite_max_speed_to_park": 0.3,  # maxSpeedToPark
+    "suite_hold_decisions": 10,      # holdDecisions
+    "suite_obs_scale": 15.0,         # obsScale
+    "suite_max_distance": 0.0,       # 0 = tắt (map 2D 630x630 rộng hơn map 3D)
+    # Động học kiểu CarController (Box action)
+    "use_kinematic": True,
+    "brake_decel": 200.0,
+    "suite_distance_shaping": 0.05,  # distanceShaping
+    "suite_align_shaping": 0.05,     # alignShaping
+    "suite_parked_check": True,      # dùng điều kiện đỗ 4-góc + tốc độ + 10°
+    "progress_weight": 0.05,
+    "step_penalty": -0.02,
     "start_jitter": [3.0, 3.0, 0.2],
     "max_speed_fwd": 60.0,
     "max_speed_rev": 30.0,

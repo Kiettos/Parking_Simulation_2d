@@ -55,6 +55,14 @@ def main():
     env = ParkingEnv(cfg)
     model = PPO.load(str(model_path), device="cpu")
 
+    # Model cũ train với Discrete(6) không chạy được trên env Box(3,) và ngược lại
+    model_act = model.action_space
+    if getattr(model_act, "shape", None) != getattr(env.action_space, "shape", None):
+        print(
+            f"[warn] model action_space={model_act} khác env={env.action_space}."
+            " Phải train lại model với action space hiện tại."
+        )
+
     pygame.init()
     screen = pygame.display.set_mode(
         (int(env.world.width), int(env.world.height))
@@ -104,7 +112,7 @@ def main():
         ended = False
         for _ in range(steps):
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(int(action))
+            obs, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
             if terminated or truncated:
                 episodes_done += 1

@@ -85,17 +85,25 @@ class ParkingEnv(gym.Env):
         self.total_successes = 0
         self._pending_decoy_spawn = False
         self.observation_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(13,), dtype=np.float32
+            low=-1.0, high=1.0, shape=(18,), dtype=np.float32
         )
-        self.action_space = spaces.Discrete(6)
+        # Giống ParkingAgent 3D: 3 action liên tục [ga/lùi, lái, phanh] trong [-1, 1]
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(3,), dtype=np.float32
+        )
 
-        # (throttle_dir, steer_dir): ±1
+        # Tương thích ngược: kịch bản/test cũ truyền số nguyên -> dùng bảng
+        # 6 action rời rạc (chỉ để test, KHÔNG dùng khi train).
         self._actions = [
             (1, -1), (1, 0), (1, 1),
             (-1, -1), (-1, 0), (-1, 1),
         ]
 
+        self.brake_decel = float(self.train_cfg.get("brake_decel", 200.0))
+        self.use_kinematic = bool(self.train_cfg.get("use_kinematic", True))
+
         self.step_penalty = float(self.train_cfg.get("step_penalty", -0.02))
+        self.progress_weight = float(self.train_cfg.get("progress_weight", 0.05))
 
         # --- Reward khi va chạm, riêng cho từng loại tile / object ---
         self.collision_reward = float(self.train_cfg.get("collision_reward", -10.0))
@@ -116,6 +124,19 @@ class ParkingEnv(gym.Env):
         self.terminate_on_collision = bool(
             self.train_cfg.get("terminate_on_collision", True)
         )
+
+        # --- Đồng bộ với ParkingAgent (Unity 3D) ---
+        self.max_angle_deg = float(self.train_cfg.get("suite_max_angle_deg", 10.0))
+        self.max_speed_to_park = float(self.train_cfg.get("suite_max_speed_to_park", 0.3))
+        self.hold_decisions = max(1, int(self.train_cfg.get("suite_hold_decisions", 10)))
+        self.obs_scale = float(self.train_cfg.get("suite_obs_scale", 15.0))
+        self.max_distance = float(self.train_cfg.get("suite_max_distance", 40.0))
+        self.distance_shaping = float(self.train_cfg.get("suite_distance_shaping", 0.05))
+        self.align_shaping = float(self.train_cfg.get("suite_align_shaping", 0.05))
+        self.use_suite_parked = bool(self.train_cfg.get("suite_parked_check", True))
+        self.parked_count = 0
+        self.prev_align = 0.0
+        self.start_episode_dist = 0.0
 
     # ------------------------------------------------------------------
     # Dựng world
@@ -203,6 +224,62 @@ class ParkingEnv(gym.Env):
     def _sensors(self):
         return sense_all(self.world, self.car, max_range=self.sensor_range)
 
+    def _slot_axes(self, slot):
+        """Trục dài / trục ngắn của slot.
+
+        OBB góc `theta`: cạnh `w` nằm dọc trục (cos theta, sin theta).
+        Nếu w < h thì cạnh dài thực chất là trục pháp tuyến (như slot 44x56).
+        """
+        ex = (math.cos(slot.theta), math.sin(slot.theta))
+        ey = (-math.sin(slot.theta), math.cos(slot.theta))
+        if slot.w >= slot.h:
+            return ex, ey
+        return ey, ex
+
+    def _angle_to_axis(self, slot):
+        """Lệch giữa mũi xe và trục dài slot, -90..90 độ (tiến/lùi như nhau)."""
+        long_axis, _ = self._slot_axes(slot)
+        fx, fy = math.cos(self.car.theta), math.sin(self.car.theta)
+        ang = math.degrees(
+            math.atan2(fx * long_axis[1] - fy * long_axis[0],
+                       fx * long_axis[0] + fy * long_axis[1])
+        )
+        if ang > 90.0:
+            ang -= 180.0
+        elif ang < -90.0:
+            ang += 180.0
+        return ang
+
+    def _slot_contains(self, obb, point):
+        """Điểm có nằm trong OBB slot không."""
+        c, s = math.cos(-obb.theta), math.sin(-obb.theta)
+        dx, dy = point[0] - obb.cx, point[1] - obb.cy
+        lx = c * dx - s * dy
+        ly = s * dx + c * dy
+        return abs(lx) <= obb.w / 2.0 and abs(ly) <= obb.h / 2.0
+
+    def _is_parked(self, slot):
+        """Điều kiện đỗ giống ParkingAgent: góc, vận tốc, cả 4 góc xe trong slot."""
+        if abs(self._angle_to_axis(slot)) > self.max_angle_deg:
+            return False
+        if abs(self.car.v) > self.max_speed_to_park:
+            return False
+        return all(self._slot_contains(slot, p) for p in self.car.obb().corners())
+
+    # ------------------------------------------------------------------
+    # Test helper: dựng trạng thái "đỗ chuẩn" (dùng trong test, không ảnh hưởng train)
+    # ------------------------------------------------------------------
+    def place_parked(self):
+        """Đặt xe đúng tâm slot đích, đúng hướng, đứng yên."""
+        slot = self.world.slots[self.target_index]
+        long_axis, _ = self._slot_axes(slot)
+        theta = math.atan2(long_axis[1], long_axis[0])
+        self.car.commit((slot.cx, slot.cy, theta, 0.0, 0.0))
+        self.prev_dist = 0.0
+        self.prev_align = 1.0
+        self.parked_count = 0
+        return slot
+
     def _get_obs(self):
         car = self.car
         sensors = self._sensors()
@@ -227,12 +304,32 @@ class ParkingEnv(gym.Env):
         dist = math.hypot(dx, dy)
         ang = math.atan2(ly, lx)
 
+        # --- Obs bổ sung để bám sát 3D ---
+        c_s, s_s = math.cos(-slot.theta), math.sin(-slot.theta)
+        local_x = c_s * dx - s_s * dy      # vị trí xe trong hệ slot
+        local_y = s_s * dx + c_s * dy
+
+        # hướng mũi xe trong hệ slot: (cos, sin) của (theta - slot.theta)
+        theta_rel = car.theta - slot.theta
+        fwd_slot_x = math.cos(theta_rel)
+        fwd_slot_y = math.sin(theta_rel)
+
+        # tâm slot trong hệ xe (lấy từ slot ngược sang xe)
+        to_slot_x = c * dx - s * dy
+        to_slot_y = s * dx + c * dy
+
         obs = sensor_vals + [
             v_norm,
             steer_norm,
             math.cos(ang),
             math.sin(ang),
             min(1.0, dist / self.obs_dist_scale),
+            # 3D parity (5 chiều)
+            local_x / self.obs_scale,
+            local_y / self.obs_scale,
+            fwd_slot_x,
+            fwd_slot_y,
+            self._angle_to_axis(slot) / 90.0,
         ]
         return np.array(obs, dtype=np.float32)
 
@@ -328,6 +425,9 @@ class ParkingEnv(gym.Env):
 
         slot = self.world.slots[self.target_index]
         self.prev_dist = math.hypot(slot.cx - self.car.x, slot.cy - self.car.y)
+        self.start_episode_dist = self.prev_dist
+        self.prev_align = 1.0 - abs(self._angle_to_axis(slot)) / 90.0
+        self.parked_count = 0
         self.step_count = 0
 
         info = {
@@ -343,26 +443,127 @@ class ParkingEnv(gym.Env):
     # ------------------------------------------------------------------
     # Step
     # ------------------------------------------------------------------
-    def step(self, action):
-        throttle_dir, steer_dir = self._actions[int(action)]
-        old = (self.car.x, self.car.y, self.car.theta, self.car.v, self.car.steer)
+    def _parse_action(self, action):
+        """Chuẩn hoá action về (throttle, steer, brake) trong [-1, 1].
 
-        # Chia nhỏ bước để tránh xuyên vật cản
+        - Box(3,):  [ga/lùi, lái, phanh] như ParkingAgent 3D.
+        - Số nguyên: vẫn chấp nhận bảng 6 action cũ (chỉ để test/eval).
+        """
+        if np.isscalar(action) or np.ndim(action) == 0:
+            throttle_dir, steer_dir = self._actions[int(action)]
+            return float(throttle_dir), float(steer_dir), -1.0
+
+        a = np.asarray(action, dtype=np.float64).reshape(-1)
+        if a.size < 3:
+            a = np.concatenate([a, np.full(3 - a.size, -1.0)])
+        throttle = float(np.clip(a[0], -1.0, 1.0))
+        steer = float(np.clip(a[1], -1.0, 1.0))
+        brake = float(np.clip(a[2], -1.0, 1.0))
+        return throttle, steer, brake
+
+    def _kinematic_step(self, throttle, steer, brake, dt):
+        """Một bước động học kiểu CarController: gia tốc + chống đảo chiều.
+
+        Trả list trạng thái con (đã commit vào self.car).
+        """
+        car = self.car
         n_sub = 3
-        sub_dt = self.dt / n_sub
-        hits = []
+        sub_dt = dt / n_sub
+        states = []
         for _ in range(n_sub):
-            v = throttle_dir * self.car.max_speed_fwd * 0.5
-            steer = steer_dir * self.car.max_steer
-            L = self.car.wheelbase
-            self.car.theta += (v / L) * math.tan(steer) * sub_dt
-            self.car.x += v * math.cos(self.car.theta) * sub_dt
-            self.car.y += v * math.sin(self.car.theta) * sub_dt
-            self.car.v = v
-            self.car.steer = steer
-            hits = self.world.collisions(self.car.obb())
-            if hits:
+            if sub_dt <= 0:
+                car.v = 0.0
                 break
+
+            # --- Lái: tốc độ đánh lái giới hạn (steer_rate) ---
+            target_steer = steer * car.max_steer
+            diff = target_steer - car.steer
+            step = car.steer_rate * sub_dt
+            new_steer = car.steer + max(-step, min(step, diff))
+
+            # --- Ga / phanh / trôi ---
+            new_v = car.v
+            engine = throttle > 0.0
+            braking = brake > 0.0 and new_v != 0.0
+            if braking:
+                sign = 1.0 if new_v > 0 else -1.0
+                new_v -= sign * self.brake_decel * sub_dt
+                if (new_v > 0) != (car.v > 0):
+                    new_v = 0.0
+            elif abs(throttle) > 1e-6:
+                if engine:
+                    new_v += car.accel * abs(throttle) * sub_dt
+                else:
+                    # Lùi: phải phanh về 0 trước, chưa đảo chiều ngay
+                    if car.v > 0.0:
+                        new_v -= self.brake_decel * sub_dt
+                        if new_v < 0.0:
+                            new_v = 0.0
+                    else:
+                        new_v -= car.accel * abs(throttle) * sub_dt
+            else:
+                # Nhả ga: xe trôi, giảm dần theo decel
+                if new_v > 0.0:
+                    new_v = max(0.0, new_v - car.decel * sub_dt)
+                elif new_v < 0.0:
+                    new_v = min(0.0, new_v + car.decel * sub_dt)
+            new_v = max(-car.max_speed_rev, min(car.max_speed_fwd, new_v))
+
+            # --- Bicycle model ---
+            new_theta = car.theta + (new_v / car.wheelbase) * math.tan(new_steer) * sub_dt
+            new_x = car.x + new_v * math.cos(new_theta) * sub_dt
+            new_y = car.y + new_v * math.sin(new_theta) * sub_dt
+
+            car.commit((new_x, new_y, new_theta, new_v, new_steer))
+            states.append((new_x, new_y, new_theta, new_v, new_steer))
+        return states
+
+    def _direct_step(self, throttle_dir, steer_dir, dt):
+        """Động học cũ: ga/lái tức thời (giữ cho tương thích ngược)."""
+        car = self.car
+        n_sub = 3
+        sub_dt = dt / n_sub
+        states = []
+        for _ in range(n_sub):
+            v = throttle_dir * car.max_speed_fwd * 0.5
+            steer = steer_dir * car.max_steer
+            L = car.wheelbase
+            car.theta += (v / L) * math.tan(steer) * sub_dt
+            car.x += v * math.cos(car.theta) * sub_dt
+            car.y += v * math.sin(car.theta) * sub_dt
+            car.v = v if sub_dt > 0 else 0.0
+            car.steer = steer
+            states.append((car.x, car.y, car.theta, car.v, car.steer))
+        return states
+
+    def step(self, action, dt=None):
+        throttle, steer, brake = self._parse_action(action)
+        old = (self.car.x, self.car.y, self.car.theta, self.car.v, self.car.steer)
+        dt = self.dt if dt is None else dt
+
+        is_discrete = np.isscalar(action) or np.ndim(action) == 0
+        use_kinematic = self.use_kinematic and not is_discrete
+
+        hits = []
+        if use_kinematic:
+            for state in self._kinematic_step(throttle, steer, brake, dt):
+                self.car.commit(state)
+                hits = self.world.collisions(self.car.obb())
+                if hits:
+                    break
+        elif is_discrete:
+            throttle_dir, steer_dir = self._actions[int(action)]
+            for state in self._direct_step(throttle_dir, steer_dir, dt):
+                self.car.commit(state)
+                hits = self.world.collisions(self.car.obb())
+                if hits:
+                    break
+        else:
+            for state in self._direct_step(throttle, steer, dt):
+                self.car.commit(state)
+                hits = self.world.collisions(self.car.obb())
+                if hits:
+                    break
 
         collided = bool(hits)
         if collided:
@@ -373,11 +574,17 @@ class ParkingEnv(gym.Env):
 
         slot = self.world.slots[self.target_index]
         dist = math.hypot(slot.cx - self.car.x, slot.cy - self.car.y)
+        align = 1.0 - abs(self._angle_to_axis(slot)) / 90.0
 
         # Va chạm: bỏ thưởng progress để agent không được "thưởng" khi lao vào
         # vật cản ở gần đích.
-        progress = 0.0 if collided else 0.05 * (self.prev_dist - dist)
+        if collided:
+            progress = 0.0
+        else:
+            progress = self.progress_weight * (self.prev_dist - dist)
+            progress += self.align_shaping * (align - self.prev_align)
         self.prev_dist = dist
+        self.prev_align = align
 
         dtheta = abs(
             ((self.car.theta - slot.theta + math.pi) % (2 * math.pi)) - math.pi
@@ -399,6 +606,8 @@ class ParkingEnv(gym.Env):
             "is_collision": False,
             "collision_kinds": [],
             "collision_reward": 0.0,
+            "align": align,
+            "parked_count": self.parked_count,
         }
 
         if collided:
@@ -413,11 +622,31 @@ class ParkingEnv(gym.Env):
             if self.terminate_on_collision:
                 terminated = True
 
-        if dist < self.success_dist and dtheta < self.success_theta and not collided:
-            reward += 200.0
+        # 3D parity: đi quá xa slot (maxDistance) -> fail. 0 = tắt.
+        if not terminated and self.max_distance > 0 and dist > self.max_distance:
+            reward += self.collision_reward
             terminated = True
-            info["is_success"] = True
-            self._on_success(info)
+            info["is_collision"] = True
+            info["collision_kinds"] = ["far_from_slot"]
+
+        if not terminated:
+            if self.use_suite_parked:
+                parked = self._is_parked(slot)
+            else:
+                parked = dist < self.success_dist and dtheta < self.success_theta
+
+            info["is_parked"] = bool(parked)
+            if parked:
+                # 3D parity: phải giữ trạng thái đỗ đủ hold_decisions bước
+                self.parked_count += 1
+                if self.parked_count >= self.hold_decisions:
+                    reward += 200.0
+                    terminated = True
+                    info["is_success"] = True
+                    self._on_success(info)
+            else:
+                self.parked_count = 0
+            info["parked_count"] = self.parked_count
 
         if self.step_count >= self.max_steps:
             truncated = True
