@@ -34,16 +34,23 @@ class RewardStatsCallback(BaseCallback):
             self._r_n += int(rewards.size)
 
         for info in self.locals.get("infos", []):
-            event = info.get("decoy_event")
-            if event == "spawn":
+            events = info.get("stage_events") or []
+            if "decoy" in events:
                 print(
-                    "[decoy] first success -> spawn decoys for next episode",
+                    f"[stage] {info.get('completed_successes')} successes ->"
+                    f" RESET ALL (decoy + spawn + target), layout {info.get('layout_index')}",
                     flush=True,
                 )
-            elif event == "respawn":
+            if "target" in events:
                 print(
-                    f"[decoy] layout {info.get('layout_index')} mastered:"
-                    f" {info.get('completed_successes')} successes -> respawn decoys",
+                    f"[stage] 60 successes -> new parking slot (same orientation),"
+                    f" layout {info.get('layout_index')}",
+                    flush=True,
+                )
+            if "spawn" in events:
+                print(
+                    f"[stage] 20 successes -> spawn shifted"
+                    f" (level {info.get('spawn_level')}, max {info.get('spawn_shift_px')}px)",
                     flush=True,
                 )
 

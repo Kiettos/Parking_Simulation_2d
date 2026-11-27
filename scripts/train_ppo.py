@@ -108,7 +108,9 @@ def main():
         f"[train] envs={n_envs} total_timesteps={total_timesteps}"
         f" log_every={log_every}"
         f" decoys={tr.get('decoy_count', 0)}"
-        f" success/layout={tr.get('decoy_success_target', 20)}",
+        f" stages: spawn/{tr.get('spawn_change_every', 20)}"
+        f" target/{tr.get('target_change_every', 60)}"
+        f" decoy/{tr.get('decoy_change_every', 180)}",
         flush=True,
     )
 

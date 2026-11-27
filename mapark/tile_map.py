@@ -20,7 +20,12 @@ DEFAULT_TRAINING = {
     "dt": 0.15,
     "decoy_count": 5,
     "decoy_seed": 7,
-    "decoy_success_target": 20,
+    # Curriculum: 3 mốc đổi khác nhau
+    "spawn_change_every": 20,     # đổi nhẹ vị trí spawn (±spawn_shift_px, trên road)
+    "target_change_every": 60,    # đổi chỗ đỗ (cùng hướng)
+    "decoy_change_every": 180,    # reset toàn bộ (decoy + spawn + target)
+    "spawn_shift_px": 30.0,
+    "max_episodes_per_stage": 300,  # 0 = tắt; kẹt quá lâu thì buộc đổi
     "random_target_slot": True,
     "success_dist": 8.0,
     "success_theta_deg": 20.0,

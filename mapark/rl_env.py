@@ -6,7 +6,13 @@ import numpy as np
 from gymnasium import spaces
 
 from mapark.car import BicycleCar
-from Unimportant.geometry import OBB
+from Unimportant.geometry import OBB, obb_intersect
+
+_obb_hit = obb_intersect
+
+
+def _normalize_angle(a):
+    return ((a + math.pi) % (2 * math.pi)) - math.pi
 from mapark.map_loader import load_map, world_from_map
 from mapark.sensors import sense_all
 from mapark.world import World
@@ -75,6 +81,26 @@ class ParkingEnv(gym.Env):
         )
         self._locked_target_index = 0
         self._locked_car_pose = None
+        self.layout_target_index = None   # target đã chốt cho layout decoy hiện tại
+
+        # --- Curriculum: 3 mốc đổi khác nhau ---
+        # 20 success: đổi nhẹ spawn point (trượt ±spawn_shift_px, trên road)
+        # 60 success: đổi chỗ đỗ (target, cùng hướng)
+        # 180 success: reset toàn bộ (decoy + spawn + target + 3 bộ đếm)
+        self.spawn_change_every = max(1, int(self.train_cfg.get("spawn_change_every", 20)))
+        self.target_change_every = max(1, int(self.train_cfg.get("target_change_every", 60)))
+        self.decoy_change_every = max(1, int(self.train_cfg.get("decoy_change_every", 180)))
+        self.spawn_shift_px = float(self.train_cfg.get("spawn_shift_px", 30.0))
+        self.max_episodes_per_stage = max(
+            0, int(self.train_cfg.get("max_episodes_per_stage", 300))
+        )
+        self.spawn_successes = 0
+        self.target_successes = 0
+        self.decoy_successes = 0
+        self.spawn_level = 0          # số mốc spawn đã qua trong chu kỳ 180
+        self.spawn_base_pose = None   # gốc spawn của layout (trượt quanh gốc này)
+        self.stage_start_episode = 0
+        self._stage_log = []
 
         self.episode_index = 0
         self.target_index = 0
@@ -199,24 +225,40 @@ class ParkingEnv(gym.Env):
         self._pending_decoy_spawn = True
 
     def _on_success(self, info):
-        """Cộng success; đủ `decoy_success_target` lần thì đổi layout.
+        """Cộng success và xét 3 mốc curriculum.
 
-        Layout gồm: decoy + spawn point + target. Chỉ khi đủ ngưỡng mới
-        đặt `_pending_decoy_spawn = True` -> episode kế tiếp random lại.
+        - `spawn_change_every` (20): đổi nhẹ spawn point
+        - `target_change_every` (60): đổi chỗ đỗ (cùng hướng)
+        - `decoy_change_every` (180): reset toàn bộ + reset cả 3 bộ đếm
         """
         self.total_successes += 1
         self.layout_successes += 1
+        self.spawn_successes += 1
+        self.target_successes += 1
+        self.decoy_successes += 1
 
-        if self.layout_successes >= self.decoy_success_target:
+        # 180: reset toàn bộ (decoy + spawn + target + 3 bộ đếm)
+        if self.decoy_successes >= self.decoy_change_every:
             info["decoy_event"] = "respawn"
-            info["layout_completed"] = True
-            info["completed_successes"] = self.layout_successes
+            info["completed_successes"] = self.decoy_successes
             self._pending_decoy_spawn = True
+            self.spawn_successes = 0
+            self.target_successes = 0
+            self.decoy_successes = 0
+            self.spawn_level = 0
+            if self.max_episodes_per_stage:
+                self.stage_start_episode = self.episode_index
+            info["stage_events"] = ["decoy"]
 
         info["layout_index"] = self.layout_index
         info["layout_successes"] = self.layout_successes
         info["total_successes"] = self.total_successes
         info["decoy_spawned"] = self.decoy_spawned
+        info["spawn_successes"] = self.spawn_successes
+        info["target_successes"] = self.target_successes
+        info["decoy_successes"] = self.decoy_successes
+        info["spawn_level"] = self.spawn_level
+        info["spawn_shift_px"] = self.spawn_shift_px
 
     # ------------------------------------------------------------------
     # Quan sát / reset
@@ -333,14 +375,63 @@ class ParkingEnv(gym.Env):
         ]
         return np.array(obs, dtype=np.float32)
 
+    # ------------------------------------------------------------------
+    # Spawn point
+    # ------------------------------------------------------------------
+    def _world_cell(self, x, y):
+        """(row, col) của ô chứa điểm, None nếu ngoài map."""
+        ts = getattr(self.world, "cell_size", None)
+        if not ts:
+            return None
+        r = int(y // ts)
+        c = int(x // ts)
+        return r, c
+
+    def _cell_is_road(self, row, col):
+        """Ô có phải đường (tile 'R') và không bị decoy chiếm."""
+        if row is None or col is None:
+            return False
+        layout = getattr(self.world, "tiles_raw", None) or []
+        if not (0 <= row < len(layout)) or not (0 <= col < len(layout[row])):
+            return False
+        if layout[row][col] != "R":
+            return False
+        ts = self.world.cell_size
+        cx = col * ts + ts / 2.0
+        cy = row * ts + ts / 2.0
+        probe = OBB(cx, cy, self.car.length, self.car.width, self.start_pose[2])
+        return not any(
+            _obb_hit(probe, d) for d in self.world.decoys
+        )
+
     def _draw_car_pose(self):
-        """Random 1 pose xuất phát (jitter quanh start_pose), không đè vật cản."""
-        base_x, base_y, base_theta = self.start_pose
+        """Random 1 pose xuất phát quanh gốc, vẫn nằm trên đường (tile R).
+
+        Mức trượt tăng dần theo số mốc đã qua trong chu kỳ 180:
+          0 mốc  -> jitter nhỏ quanh gốc
+          >=1    -> trượt ngẫu nhiên trong ±spawn_shift_px quanh gốc
+        """
+        base_x, base_y, base_theta = (
+            self.spawn_base_pose or self.start_pose
+        )
         jx, jy, jt = self.start_jitter
-        for _ in range(30):
-            x = base_x + float(self.np_random.uniform(-jx, jx))
-            y = base_y + float(self.np_random.uniform(-jy, jy))
+        shift = self.spawn_shift_px
+        shifted = self.spawn_level > 0
+
+        for i in range(40):
+            if shifted:
+                # trượt ±spawn_shift_px quanh vị trí spawn gốc của layout
+                x = base_x + float(self.np_random.uniform(-shift, shift))
+                y = base_y + float(self.np_random.uniform(-shift, shift))
+            else:
+                x = base_x + float(self.np_random.uniform(-jx, jx))
+                y = base_y + float(self.np_random.uniform(-jy, jy))
             theta = base_theta + float(self.np_random.uniform(-jt, jt))
+
+            cell = self._world_cell(x, y)
+            if cell is None or not self._cell_is_road(*cell):
+                continue
+
             self.car.commit((x, y, theta, 0.0, 0.0))
             if not self.world.car_collides(self.car.obb()):
                 return (x, y, theta)
@@ -349,7 +440,7 @@ class ParkingEnv(gym.Env):
         return (base_x, base_y, base_theta)
 
     def _spawn_car(self):
-        """Đặt xe vào pose đã khoá của layout; chỉ random lại khi có reset"""
+        """Đặt xe vào pose đã khoá của stage; chỉ random lại khi có reset"""
         if self._locked_car_pose is None:
             self._locked_car_pose = self._draw_car_pose()
         x, y, theta = self._locked_car_pose
@@ -364,29 +455,39 @@ class ParkingEnv(gym.Env):
         free = self.world.free_slot_indices()
         if not free:
             free = list(range(self.num_slots))
-        # "chỉ thay đổi target": ưu tiên slot khác slot đã khoá
-        if len(free) > 1:
-            choices = [i for i in free if i != self._locked_target_index]
+
+        base = (
+            self.layout_target_index
+            if self.layout_target_index is not None
+            else self._locked_target_index
+        )
+        # Mốc 60: ưu tiên slot khác target gốc của layout -> thấy khác biệt rõ
+        if len(free) > 1 and base is not None:
+            choices = [i for i in free if i != base]
             if choices:
                 free = choices
         return int(free[int(self.np_random.integers(len(free)))])
 
     def _lock_target_slot(self):
-        """Giữ nguyên target của layout; chỉ random lại khi có reset."""
+        """Chốt target cho layout hiện tại; chỉ đổi khi tới mốc 60 hoặc 180."""
         if (
             self._locked_target_index is None
             or self._locked_target_index in self.decoy_slots
         ):
             self._locked_target_index = self._pick_target_slot()
+        self.layout_target_index = self._locked_target_index
         return self._locked_target_index
 
     def _reset_layout(self):
-        """Random lại toàn bộ layout: decoy + spawn point + target."""
+        """Mốc 180: random lại toàn bộ layout (decoy + spawn point + target)."""
         self._locked_car_pose = None
         self._locked_target_index = None
+        self.layout_target_index = None
 
         self.layout_successes = 0
         self._pending_decoy_spawn = False
+        self.spawn_level = 0
+        self.spawn_base_pose = None
 
         if self.decoy_count <= 0 or self.num_slots <= 1:
             self.world.set_decoys([])
@@ -411,13 +512,78 @@ class ParkingEnv(gym.Env):
         self.decoy_slots = ids
         self.decoy_spawned = True
 
+    def _advance_stages(self, last_step=False):
+        """Đổi stage. Gọi từ reset(), hoặc khi một stage kéo quá lâu.
+
+        Trả list sự kiện: "spawn" | "target" | "decoy".
+        """
+        events = []
+        if self._pending_decoy_spawn:
+            events.append("decoy")
+            self._pending_decoy_spawn = False
+            self.spawn_successes = 0
+            self.target_successes = 0
+            self.decoy_successes = 0
+            self.spawn_level = 0
+            self.stage_start_episode = self.episode_index
+            return events
+
+        # Target: đổi theo mốc tuyệt đối trong chu kỳ 180
+        if self.target_successes >= self.target_change_every:
+            self.target_successes = 0
+            self._locked_target_index = None
+            self.layout_target_index = None
+            self.stage_start_episode = self.episode_index
+            events.append("target")
+
+        # Spawn: mỗi `spawn_change_every` success
+        if self.spawn_successes >= self.spawn_change_every:
+            self.spawn_successes = 0
+            self.spawn_level += 1
+            self._locked_car_pose = None
+            self.stage_start_episode = self.episode_index
+            events.append("spawn")
+
+        return events
+
+    def _force_stage_advance(self):
+        """Kẹt quá `max_episodes_per_stage` -> buộc tiến stage gần nhất."""
+        if not self.max_episodes_per_stage:
+            return []
+        if self.episode_index - self.stage_start_episode < self.max_episodes_per_stage:
+            return []
+
+        # Chọn mốc chưa đạt có ngưỡng nhỏ nhất
+        pending = []
+        if self.spawn_successes < self.spawn_change_every:
+            pending.append(("spawn", self.spawn_successes, self.spawn_change_every))
+        if self.target_successes < self.target_change_every:
+            pending.append(("target", self.target_successes, self.target_change_every))
+        if not pending:
+            return []
+
+        kind, _, _ = min(pending, key=lambda x: x[1])
+        self.stage_start_episode = self.episode_index
+        if kind == "spawn":
+            self.spawn_successes = 0
+            self.spawn_level += 1
+            self._locked_car_pose = None
+        else:
+            self.target_successes = 0
+            self._locked_target_index = None
+        return [kind]
+
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         self.episode_index += 1
 
-        # Chỉ random lại decoy / spawn point / target khi đủ ngưỡng success.
+        # Buộc đổi stage nếu agent kẹt quá lâu ở stage hiện tại
+        forced = self._force_stage_advance()
+
         if self._pending_decoy_spawn or (self.decoy_on_reset and self.layout_index == 0):
             self._reset_layout()
+
+        stage_events = self._advance_stages() + forced
 
         self._spawn_car()
         self.target_index = self._lock_target_slot()
@@ -437,6 +603,13 @@ class ParkingEnv(gym.Env):
             "layout_index": self.layout_index,
             "layout_successes": self.layout_successes,
             "total_successes": self.total_successes,
+            "spawn_successes": self.spawn_successes,
+            "target_successes": self.target_successes,
+            "decoy_successes": self.decoy_successes,
+            "spawn_level": self.spawn_level,
+            "spawn_shift_px": self.spawn_shift_px,
+            "stage_events": stage_events,
+            "forced_stage": list(forced),
         }
         return self._get_obs(), info
 

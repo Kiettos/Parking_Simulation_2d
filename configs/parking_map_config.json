@@ -6,8 +6,14 @@
     "length": 43.6,
     "color": "#0d47a1"
   },
-  "legend": {
-    "tiles": {
+  "training": {
+    "spawn_change_every": 20,
+    "target_change_every": 60,
+    "decoy_change_every": 180,
+    "spawn_shift_px": 30.0,
+    "max_episodes_per_stage": 300
+  },
+  "legend": {    "tiles": {
       "C": {
         "name": "casual_tile",
         "size": [
