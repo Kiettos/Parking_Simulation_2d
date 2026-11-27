@@ -14,6 +14,10 @@ from mapark.sensors import sense_all
 from mapark.tile_map import build_runtime_config
 from render2d.app import draw_world
 
+# Mức tăng tốc: số bước môi trường cho mỗi khung hình
+SPEED_STEPS = [1, 2, 4, 8, 16, 32]
+FPS = 30
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run a trained PPO agent")
@@ -33,6 +37,13 @@ def main():
         default=None,
         help="Path to model .zip (default: training.model_out)",
     )
+    parser.add_argument(
+        "--speed",
+        type=int,
+        default=1,
+        choices=SPEED_STEPS,
+        help="Steps per frame at startup",
+    )
     args = parser.parse_args()
 
     cfg = build_runtime_config(args.map_config, args.map, args.map_name)
@@ -48,7 +59,10 @@ def main():
     screen = pygame.display.set_mode(
         (int(env.world.width), int(env.world.height))
     )
-    pygame.display.set_caption(f"ParkSim2D — PPO ({model_path.name})")
+    pygame.display.set_caption(
+        f"ParkSim2D — PPO ({model_path.name})"
+        "  [SPACE] pause  [↑/↓] speed  [N] no-render  [R] reset  [ESC] quit"
+    )
     font = pygame.font.SysFont("consolas", 16)
     clock = pygame.time.Clock()
 
@@ -56,6 +70,12 @@ def main():
     total_reward = 0.0
     status = "Running"
     last_result = ""
+
+    speed_idx = SPEED_STEPS.index(args.speed)
+    paused = False
+    render_world = True
+    episodes_done = 0
+    successes = 0
 
     running = True
     while running:
@@ -70,10 +90,43 @@ def main():
                     total_reward = 0.0
                     status = "Reset"
                     last_result = ""
+                elif event.key == pygame.K_SPACE:
+                    paused = not paused
+                elif event.key in (pygame.K_UP, pygame.K_RIGHT, pygame.K_EQUALS, pygame.K_PLUS):
+                    speed_idx = min(speed_idx + 1, len(SPEED_STEPS) - 1)
+                elif event.key in (pygame.K_DOWN, pygame.K_LEFT, pygame.K_MINUS):
+                    speed_idx = max(speed_idx - 1, 0)
+                elif event.key == pygame.K_n:
+                    render_world = not render_world
 
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, terminated, truncated, info = env.step(int(action))
-        total_reward += reward
+        steps = 0 if paused else SPEED_STEPS[speed_idx]
+
+        ended = False
+        for _ in range(steps):
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env.step(int(action))
+            total_reward += reward
+            if terminated or truncated:
+                episodes_done += 1
+                if info.get("is_success"):
+                    successes += 1
+                    status = "PARKED"
+                elif info.get("is_collision"):
+                    status = "COLLIDED"
+                else:
+                    status = "Timeout"
+                last_result = f"return={total_reward:.1f}"
+                obs, info = env.reset()
+                total_reward = 0.0
+                ended = True
+                if steps == 1:
+                    pygame.time.wait(700)
+                break
+
+        clock.tick(FPS if SPEED_STEPS[speed_idx] < 8 else 0)
+
+        if not render_world or SPEED_STEPS[speed_idx] >= 16:
+            continue
 
         env.world.sensors = sense_all(
             env.world, env.car, max_range=env.sensor_range
@@ -91,21 +144,16 @@ def main():
         screen.blit(hud1, (10, 10))
         hud2 = font.render(f"{status}  {last_result}", True, (30, 30, 30))
         screen.blit(hud2, (10, 30))
+        hud3 = font.render(
+            f"x{SPEED_STEPS[speed_idx]} steps/frame"
+            f"  episodes={episodes_done}  parked={successes}"
+            f"  {'PAUSED' if paused else ''}"
+            f"  {'(no render)' if not render_world else ''}",
+            True,
+            (0, 90, 190),
+        )
+        screen.blit(hud3, (10, 50))
         pygame.display.flip()
-        clock.tick(30)
-
-        if terminated or truncated:
-            if info.get("is_success"):
-                status = "PARKED"
-            elif info.get("is_collision"):
-                status = "COLLIDED"
-            else:
-                status = "Timeout"
-            last_result = f"return={total_reward:.1f}"
-            pygame.time.wait(700)
-            obs, info = env.reset()
-            total_reward = 0.0
-            status = "Running"
 
     pygame.quit()
 

@@ -1,0 +1,146 @@
+(.venv311) PS C:\Users\KIET PC\Desktop\ParkSim2D> .venv311\Scripts\python.exe scripts\train_ppo.py
+[map] VuongGoc: 21x21 cell=60.0 slots=10 obstacles=0 car=43.6x18.4
+[train] envs=4 total_timesteps=500000 log_every=10000 decoys=5 success/layout=20
+[train] step=  10000 | reward/step mean=-0.086 std=0.849 | ep_return mean=-11.1 std=2.8 | success=0.0% (0/78 episodes)
+[train] step=  20000 | reward/step mean=+0.001 std=0.350 | ep_return mean=-0.1 std=9.3 | success=0.0% (0/33 episodes)
+[train] step=  30000 | reward/step mean=+0.057 std=0.244 | ep_return mean=+19.6 std=13.0 | success=0.0% (0/28 episodes)
+[train] step=  40000 | reward/step mean=+0.093 std=0.164 | ep_return mean=+35.9 std=5.7 | success=0.0% (0/24 episodes)
+[train] step=  50000 | reward/step mean=+0.309 std=6.320 | ep_return mean=+118.8 std=97.9 | success=38.5% (10/26 episodes)
+[train] step=  60000 | reward/step mean=+0.310 std=6.317 | ep_return mean=+119.0 std=97.7 | success=38.5% (10/26 episodes)
+[train] step=  70000 | reward/step mean=+0.511 std=8.933 | ep_return mean=+196.3 std=84.6 | success=76.9% (20/26 episodes)
+[train] step=  80000 | reward/step mean=+0.496 std=8.708 | ep_return mean=+183.2 std=91.8 | success=70.4% (19/27 episodes)
+[decoy] layout 0 mastered: 20 successes -> respawn decoys
+[train] step=  90000 | reward/step mean=+0.390 std=7.476 | ep_return mean=+146.1 std=100.3 | success=51.9% (14/27 episodes)
+[decoy] layout 0 mastered: 20 successes -> respawn decoys
+[decoy] layout 0 mastered: 20 successes -> respawn decoys
+[decoy] layout 0 mastered: 20 successes -> respawn decoys
+[train] step= 100000 | reward/step mean=+0.450 std=8.237 | ep_return mean=+166.1 std=95.0 | success=63.0% (17/27 episodes)
+[train] step= 110000 | reward/step mean=+0.554 std=9.368 | ep_return mean=+178.0 std=93.1 | success=71.0% (22/31 episodes)
+[decoy] layout 1 mastered: 20 successes -> respawn decoys
+[train] step= 120000 | reward/step mean=+0.594 std=9.784 | ep_return mean=+191.7 std=80.7 | success=77.4% (24/31 episodes)
+[train] step= 130000 | reward/step mean=+0.739 std=11.112 | ep_return mean=+217.3 std=59.0 | success=91.2% (31/34 episodes)
+[decoy] layout 1 mastered: 20 successes -> respawn decoys
+[decoy] layout 1 mastered: 20 successes -> respawn decoys
+[decoy] layout 2 mastered: 20 successes -> respawn decoys
+[decoy] layout 1 mastered: 20 successes -> respawn decoys
+[train] step= 140000 | reward/step mean=+0.893 std=12.459 | ep_return mean=+229.5 std=10.1 | success=100.0% (39/39 episodes)
+[decoy] layout 2 mastered: 20 successes -> respawn decoys
+[train] step= 150000 | reward/step mean=+0.855 std=12.136 | ep_return mean=+219.4 std=44.2 | success=94.9% (37/39 episodes)
+[decoy] layout 2 mastered: 20 successes -> respawn decoys
+[decoy] layout 2 mastered: 20 successes -> respawn decoys
+[train] step= 160000 | reward/step mean=+0.646 std=10.179 | ep_return mean=+179.1 std=95.1 | success=72.2% (26/36 episodes)
+[decoy] layout 3 mastered: 20 successes -> respawn decoys
+[train] step= 170000 | reward/step mean=+0.777 std=11.290 | ep_return mean=+198.4 std=85.4 | success=82.1% (32/39 episodes)
+[decoy] layout 3 mastered: 20 successes -> respawn decoys
+[decoy] layout 3 mastered: 20 successes -> respawn decoys
+[train] step= 180000 | reward/step mean=+0.860 std=11.974 | ep_return mean=+221.1 std=59.0 | success=92.3% (36/39 episodes)
+[decoy] layout 3 mastered: 20 successes -> respawn decoys
+[decoy] layout 4 mastered: 20 successes -> respawn decoys
+[train] step= 190000 | reward/step mean=+0.945 std=12.617 | ep_return mean=+237.3 std=9.4 | success=100.0% (40/40 episodes)
+[decoy] layout 4 mastered: 20 successes -> respawn decoys
+[decoy] layout 4 mastered: 20 successes -> respawn decoys
+[train] step= 200000 | reward/step mean=+0.935 std=12.456 | ep_return mean=+238.2 std=8.8 | success=100.0% (39/39 episodes)
+[decoy] layout 4 mastered: 20 successes -> respawn decoys
+[decoy] layout 5 mastered: 20 successes -> respawn decoys
+[train] step= 210000 | reward/step mean=+1.132 std=13.956 | ep_return mean=+232.6 std=10.3 | success=100.0% (49/49 episodes)
+[decoy] layout 5 mastered: 20 successes -> respawn decoys
+[decoy] layout 5 mastered: 20 successes -> respawn decoys
+[train] step= 220000 | reward/step mean=+0.972 std=12.771 | ep_return mean=+219.7 std=54.0 | success=93.2% (41/44 episodes)
+[decoy] layout 6 mastered: 20 successes -> respawn decoys
+[decoy] layout 5 mastered: 20 successes -> respawn decoys
+[decoy] layout 6 mastered: 20 successes -> respawn decoys
+[train] step= 230000 | reward/step mean=+0.984 std=12.771 | ep_return mean=+239.7 std=10.3 | success=100.0% (41/41 episodes)
+[decoy] layout 6 mastered: 20 successes -> respawn decoys
+[train] step= 240000 | reward/step mean=+0.987 std=12.773 | ep_return mean=+241.2 std=10.2 | success=100.0% (41/41 episodes)
+[decoy] layout 6 mastered: 20 successes -> respawn decoys
+[decoy] layout 7 mastered: 20 successes -> respawn decoys
+[decoy] layout 7 mastered: 20 successes -> respawn decoys
+[train] step= 250000 | reward/step mean=+1.009 std=12.926 | ep_return mean=+241.5 std=9.9 | success=100.0% (42/42 episodes)
+[decoy] layout 8 mastered: 20 successes -> respawn decoys
+[train] step= 260000 | reward/step mean=+1.027 std=13.075 | ep_return mean=+237.9 std=12.1 | success=100.0% (43/43 episodes)
+[decoy] layout 7 mastered: 20 successes -> respawn decoys
+[decoy] layout 7 mastered: 20 successes -> respawn decoys
+[decoy] layout 9 mastered: 20 successes -> respawn decoys
+[train] step= 270000 | reward/step mean=+1.029 std=13.077 | ep_return mean=+238.7 std=14.1 | success=100.0% (43/43 episodes)
+[decoy] layout 8 mastered: 20 successes -> respawn decoys
+[train] step= 280000 | reward/step mean=+1.022 std=13.076 | ep_return mean=+232.4 std=32.0 | success=97.7% (43/44 episodes)
+[decoy] layout 9 mastered: 20 successes -> respawn decoys
+[decoy] layout 8 mastered: 20 successes -> respawn decoys
+[decoy] layout 8 mastered: 20 successes -> respawn decoys
+[train] step= 290000 | reward/step mean=+1.184 std=14.232 | ep_return mean=+233.0 std=14.1 | success=100.0% (51/51 episodes)
+[decoy] layout 10 mastered: 20 successes -> respawn decoys
+[decoy] layout 10 mastered: 20 successes -> respawn decoys
+[decoy] layout 9 mastered: 20 successes -> respawn decoys
+[train] step= 300000 | reward/step mean=+1.321 std=15.175 | ep_return mean=+227.4 std=9.7 | success=100.0% (58/58 episodes)
+[decoy] layout 11 mastered: 20 successes -> respawn decoys
+[decoy] layout 11 mastered: 20 successes -> respawn decoys
+[decoy] layout 9 mastered: 20 successes -> respawn decoys
+[decoy] layout 10 mastered: 20 successes -> respawn decoys
+[train] step= 310000 | reward/step mean=+1.301 std=15.044 | ep_return mean=+228.7 std=10.9 | success=100.0% (57/57 episodes)
+[decoy] layout 12 mastered: 20 successes -> respawn decoys
+[decoy] layout 10 mastered: 20 successes -> respawn decoys
+[train] step= 320000 | reward/step mean=+1.065 std=13.375 | ep_return mean=+235.1 std=10.2 | success=100.0% (45/45 episodes)
+[decoy] layout 12 mastered: 20 successes -> respawn decoys
+[decoy] layout 11 mastered: 20 successes -> respawn decoys
+[train] step= 330000 | reward/step mean=+0.989 std=12.766 | ep_return mean=+236.1 std=31.4 | success=97.6% (41/42 episodes)
+[decoy] layout 11 mastered: 20 successes -> respawn decoys
+[decoy] layout 13 mastered: 20 successes -> respawn decoys
+[train] step= 340000 | reward/step mean=+0.994 std=12.767 | ep_return mean=+242.9 std=9.0 | success=100.0% (41/41 episodes)
+[decoy] layout 13 mastered: 20 successes -> respawn decoys
+[decoy] layout 14 mastered: 20 successes -> respawn decoys
+[decoy] layout 12 mastered: 20 successes -> respawn decoys
+[train] step= 350000 | reward/step mean=+1.089 std=13.521 | ep_return mean=+235.6 std=13.8 | success=100.0% (46/46 episodes)
+[decoy] layout 12 mastered: 20 successes -> respawn decoys
+[train] step= 360000 | reward/step mean=+0.959 std=12.454 | ep_return mean=+246.1 std=0.7 | success=100.0% (39/39 episodes)
+[decoy] layout 14 mastered: 20 successes -> respawn decoys
+[decoy] layout 13 mastered: 20 successes -> respawn decoys
+[train] step= 370000 | reward/step mean=+1.015 std=12.923 | ep_return mean=+242.9 std=8.2 | success=100.0% (42/42 episodes)
+[decoy] layout 15 mastered: 20 successes -> respawn decoys
+[decoy] layout 13 mastered: 20 successes -> respawn decoys
+[decoy] layout 15 mastered: 20 successes -> respawn decoys
+[train] step= 380000 | reward/step mean=+1.380 std=15.560 | ep_return mean=+225.6 std=9.7 | success=100.0% (61/61 episodes)
+[decoy] layout 16 mastered: 20 successes -> respawn decoys
+[decoy] layout 14 mastered: 20 successes -> respawn decoys
+[decoy] layout 16 mastered: 20 successes -> respawn decoys
+[train] step= 390000 | reward/step mean=+1.266 std=14.779 | ep_return mean=+230.2 std=12.6 | success=100.0% (55/55 episodes)
+[decoy] layout 15 mastered: 20 successes -> respawn decoys
+[decoy] layout 14 mastered: 20 successes -> respawn decoys
+[decoy] layout 17 mastered: 20 successes -> respawn decoys
+[train] step= 400000 | reward/step mean=+1.344 std=15.302 | ep_return mean=+228.3 std=12.4 | success=100.0% (59/59 episodes)
+[decoy] layout 17 mastered: 20 successes -> respawn decoys
+[decoy] layout 16 mastered: 20 successes -> respawn decoys
+[train] step= 410000 | reward/step mean=+1.185 std=14.235 | ep_return mean=+223.4 std=42.5 | success=96.2% (51/53 episodes)
+[decoy] layout 15 mastered: 20 successes -> respawn decoys
+[decoy] layout 18 mastered: 20 successes -> respawn decoys
+[decoy] layout 18 mastered: 20 successes -> respawn decoys
+[train] step= 420000 | reward/step mean=+1.227 std=14.508 | ep_return mean=+231.3 std=11.2 | success=100.0% (53/53 episodes)
+[decoy] layout 16 mastered: 20 successes -> respawn decoys
+[decoy] layout 17 mastered: 20 successes -> respawn decoys
+[decoy] layout 19 mastered: 20 successes -> respawn decoys
+[train] step= 430000 | reward/step mean=+1.323 std=15.173 | ep_return mean=+228.2 std=10.3 | success=100.0% (58/58 episodes)
+[decoy] layout 19 mastered: 20 successes -> respawn decoys
+[decoy] layout 18 mastered: 20 successes -> respawn decoys
+[train] step= 440000 | reward/step mean=+1.169 std=14.094 | ep_return mean=+233.7 std=10.8 | success=100.0% (50/50 episodes)
+[decoy] layout 20 mastered: 20 successes -> respawn decoys
+[decoy] layout 17 mastered: 20 successes -> respawn decoys
+[train] step= 450000 | reward/step mean=+1.090 std=13.523 | ep_return mean=+236.8 std=12.3 | success=100.0% (46/46 episodes)
+[decoy] layout 20 mastered: 20 successes -> respawn decoys
+[decoy] layout 21 mastered: 20 successes -> respawn decoys
+[decoy] layout 19 mastered: 20 successes -> respawn decoys
+[train] step= 460000 | reward/step mean=+1.126 std=13.812 | ep_return mean=+234.8 std=13.6 | success=100.0% (48/48 episodes)
+[decoy] layout 21 mastered: 20 successes -> respawn decoys
+[decoy] layout 18 mastered: 20 successes -> respawn decoys
+[train] step= 470000 | reward/step mean=+1.151 std=13.954 | ep_return mean=+234.4 std=11.7 | success=100.0% (49/49 episodes)
+[decoy] layout 22 mastered: 20 successes -> respawn decoys
+[decoy] layout 19 mastered: 20 successes -> respawn decoys
+[decoy] layout 22 mastered: 20 successes -> respawn decoys
+[decoy] layout 20 mastered: 20 successes -> respawn decoys
+[train] step= 480000 | reward/step mean=+1.073 std=13.376 | ep_return mean=+238.6 std=10.9 | success=100.0% (45/45 episodes)
+[train] step= 490000 | reward/step mean=+1.033 std=13.075 | ep_return mean=+238.8 std=10.7 | success=100.0% (43/43 episodes)
+[decoy] layout 21 mastered: 20 successes -> respawn decoys
+[decoy] layout 23 mastered: 20 successes -> respawn decoys
+[decoy] layout 20 mastered: 20 successes -> respawn decoys
+[decoy] layout 23 mastered: 20 successes -> respawn decoys
+[train] step= 500000 | reward/step mean=+1.055 std=13.226 | ep_return mean=+241.2 std=10.2 | success=100.0% (44/44 episodes)
+[decoy] layout 21 mastered: 20 successes -> respawn decoys
+[train] saved -> C:\Users\KIET PC\Desktop\ParkSim2D\models\ppo_park_tiles.zip
