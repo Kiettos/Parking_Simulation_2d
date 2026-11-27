@@ -26,6 +26,11 @@ DEFAULT_TRAINING = {
     "decoy_change_every": 180,    # reset toàn bộ (decoy + spawn + target)
     "spawn_shift_px": 30.0,
     "max_episodes_per_stage": 300,  # 0 = tắt; kẹt quá lâu thì buộc đổi
+    # --- Phase 1 "easy": bỏ logic 3D trong N success đầu ---
+    "curriculum_easy": True,
+    "easy_successes": 180,
+    "easy_success_dist": 30.0,
+    "easy_success_theta_deg": 45.0,
     "random_target_slot": True,
     "success_dist": 8.0,
     "success_theta_deg": 20.0,

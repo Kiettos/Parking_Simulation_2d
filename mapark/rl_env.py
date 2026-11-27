@@ -1,4 +1,4 @@
-import math
+﻿import math
 import random
 
 import gymnasium as gym
@@ -30,7 +30,7 @@ class ParkingEnv(gym.Env):
         self.max_steps = int(self.train_cfg.get("max_steps", max_steps))
         self.dt = float(self.train_cfg.get("dt", dt))
 
-        # --- Map: ưu tiên spec dựng từ 2 file JSON, fallback map JSON/config cũ ---
+        # --- Map: Æ°u tiÃªn spec dá»±ng tá»« 2 file JSON, fallback map JSON/config cÅ© ---
         if config.get("map_spec"):
             self.world = world_from_map(config["map_spec"])
             self.start_pose = self.world.start_pose
@@ -48,12 +48,12 @@ class ParkingEnv(gym.Env):
         self.car = self.world.car
         self.num_slots = len(self.world.slots)
         if self.num_slots == 0:
-            raise ValueError("Map cần ít nhất một slot đỗ")
+            raise ValueError("Map cáº§n Ã­t nháº¥t má»™t slot Ä‘á»—")
 
         # --- Decoy ---
-        # `decoy_count`      : số decoy mỗi layout decoy
-        # `decoy_first_count`: số decoy ở lần init ĐẦU (0 = bãi trống)
-        # `decoy_on_reset`   : đặt decoy ngay từ episode 1 (thay vì bãi trống)
+        # `decoy_count`      : sá»‘ decoy má»—i layout decoy
+        # `decoy_first_count`: sá»‘ decoy á»Ÿ láº§n init Äáº¦U (0 = bÃ£i trá»‘ng)
+        # `decoy_on_reset`   : Ä‘áº·t decoy ngay tá»« episode 1 (thay vÃ¬ bÃ£i trá»‘ng)
         self.decoy_count = int(self.train_cfg.get("decoy_count", 0))
         self.decoy_seed = int(self.train_cfg.get("decoy_seed", 0))
         self.decoy_success_target = max(1, int(self.train_cfg.get("decoy_success_target", 20)))
@@ -61,14 +61,14 @@ class ParkingEnv(gym.Env):
         self.decoy_first_count = int(
             self.train_cfg.get("decoy_first_count", self.decoy_count)
         )
-        # decoy ép ngay từ init thay vì để bãi trống
+        # decoy Ã©p ngay tá»« init thay vÃ¬ Ä‘á»ƒ bÃ£i trá»‘ng
         self.force_hard_start = bool(self.train_cfg.get("force_hard_start", False))
         if self.force_hard_start:
             self.decoy_first_count = self.decoy_count
         self.decoy_first_count = max(0, min(self.decoy_first_count, self.num_slots - 1))
-        # luôn chừa ít nhất 1 slot trống làm đích
+        # luÃ´n chá»«a Ã­t nháº¥t 1 slot trá»‘ng lÃ m Ä‘Ã­ch
         self.decoy_count = max(0, min(self.decoy_count, self.num_slots - 1))
-        self.easy_layout_done = False     # đã chạy xong layout bãi trống
+        self.easy_layout_done = False     # Ä‘Ã£ cháº¡y xong layout bÃ£i trá»‘ng
 
         self.success_dist = float(self.train_cfg.get("success_dist", 15.0))
         self.success_theta = math.radians(
@@ -80,23 +80,23 @@ class ParkingEnv(gym.Env):
         jitter = self.train_cfg.get("start_jitter", [30.0, 30.0, 0.3])
         self.start_jitter = (float(jitter[0]), float(jitter[1]), float(jitter[2]))
 
-        # Spawn point / target chỉ đổi khi _layout_changed() == True.
+        # Spawn point / target chá»‰ Ä‘á»•i khi _layout_changed() == True.
         self.random_start_pose = bool(self.train_cfg.get("random_start_pose", True))
 
-        # Map mới: đích ngẫu nhiên trong các slot trống.
-        # Config kiểu cũ: giữ slot 0 để không phá model đã train trước đây.
+        # Map má»›i: Ä‘Ã­ch ngáº«u nhiÃªn trong cÃ¡c slot trá»‘ng.
+        # Config kiá»ƒu cÅ©: giá»¯ slot 0 Ä‘á»ƒ khÃ´ng phÃ¡ model Ä‘Ã£ train trÆ°á»›c Ä‘Ã¢y.
         default_random_target = "map" in config
         self.random_target_slot = bool(
             self.train_cfg.get("random_target_slot", default_random_target)
         )
         self._locked_target_index = 0
         self._locked_car_pose = None
-        self.layout_target_index = None   # target đã chốt cho layout decoy hiện tại
+        self.layout_target_index = None   # target Ä‘Ã£ chá»‘t cho layout decoy hiá»‡n táº¡i
 
-        # --- Curriculum: 3 mốc đổi khác nhau ---
-        # 20 success: đổi nhẹ spawn point (trượt ±spawn_shift_px, trên road)
-        # 60 success: đổi chỗ đỗ (target, cùng hướng)
-        # 180 success: reset toàn bộ (decoy + spawn + target + 3 bộ đếm)
+        # --- Curriculum: 3 má»‘c Ä‘á»•i khÃ¡c nhau ---
+        # 20 success: Ä‘á»•i nháº¹ spawn point (trÆ°á»£t Â±spawn_shift_px, trÃªn road)
+        # 60 success: Ä‘á»•i chá»— Ä‘á»— (target, cÃ¹ng hÆ°á»›ng)
+        # 180 success: reset toÃ n bá»™ (decoy + spawn + target + 3 bá»™ Ä‘áº¿m)
         self.spawn_change_every = max(1, int(self.train_cfg.get("spawn_change_every", 20)))
         self.target_change_every = max(1, int(self.train_cfg.get("target_change_every", 60)))
         self.decoy_change_every = max(1, int(self.train_cfg.get("decoy_change_every", 180)))
@@ -107,10 +107,21 @@ class ParkingEnv(gym.Env):
         self.spawn_successes = 0
         self.target_successes = 0
         self.decoy_successes = 0
-        self.spawn_level = 0          # số mốc spawn đã qua trong chu kỳ 180
-        self.spawn_base_pose = None   # gốc spawn của layout (trượt quanh gốc này)
+        self.spawn_level = 0          # sá»‘ má»‘c spawn Ä‘Ã£ qua trong chu ká»³ 180
+        self.spawn_base_pose = None   # gá»‘c spawn cá»§a layout (trÆ°á»£t quanh gá»‘c nÃ y)
         self.stage_start_episode = 0
         self._stage_log = []
+
+        # --- Phase 1 "easy": bá» bá»›t logic 3D trong `easy_successes` success Ä‘áº§u ---
+        # TrÆ°á»›c 180 success: chá»‰ cáº§n tÃ¢m xe gáº§n slot + hÆ°á»›ng gáº§n Ä‘Ãºng, khÃ´ng cáº§n
+        # 4 gÃ³c trong slot / Ä‘á»©ng yÃªn / hold 10 bÆ°á»›c. Sau Ä‘Ã³ quay vá» Ä‘Ãºng logic
+        # ParkingAgent 3D (giá»¯ nguyÃªn nhÆ° HEAD).
+        self.curriculum_easy = bool(self.train_cfg.get("curriculum_easy", True))
+        self.easy_successes = max(1, int(self.train_cfg.get("easy_successes", 180)))
+        self.easy_success_dist = float(self.train_cfg.get("easy_success_dist", 30.0))
+        self.easy_success_theta_deg = float(
+            self.train_cfg.get("easy_success_theta_deg", 45.0)
+        )
 
         self.episode_index = 0
         self.target_index = 0
@@ -123,13 +134,13 @@ class ParkingEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(18,), dtype=np.float32
         )
-        # Giống ParkingAgent 3D: 3 action liên tục [ga/lùi, lái, phanh] trong [-1, 1]
+        # Giá»‘ng ParkingAgent 3D: 3 action liÃªn tá»¥c [ga/lÃ¹i, lÃ¡i, phanh] trong [-1, 1]
         self.action_space = spaces.Box(
             low=-1.0, high=1.0, shape=(3,), dtype=np.float32
         )
 
-        # Tương thích ngược: kịch bản/test cũ truyền số nguyên -> dùng bảng
-        # 6 action rời rạc (chỉ để test, KHÔNG dùng khi train).
+        # TÆ°Æ¡ng thÃ­ch ngÆ°á»£c: ká»‹ch báº£n/test cÅ© truyá»n sá»‘ nguyÃªn -> dÃ¹ng báº£ng
+        # 6 action rá»i ráº¡c (chá»‰ Ä‘á»ƒ test, KHÃ”NG dÃ¹ng khi train).
         self._actions = [
             (1, -1), (1, 0), (1, 1),
             (-1, -1), (-1, 0), (-1, 1),
@@ -142,7 +153,7 @@ class ParkingEnv(gym.Env):
         self.progress_weight = float(self.train_cfg.get("progress_weight", 0.02))
         self.success_reward = float(self.train_cfg.get("success_reward", 150.0))
 
-        # --- Reward khi va chạm, riêng cho từng loại tile / object ---
+        # --- Reward khi va cháº¡m, riÃªng cho tá»«ng loáº¡i tile / object ---
         self.collision_reward = float(self.train_cfg.get("collision_reward", -10.0))
         default_kind = {
             "wall": self.collision_reward,
@@ -162,7 +173,7 @@ class ParkingEnv(gym.Env):
             self.train_cfg.get("terminate_on_collision", True)
         )
 
-        # --- Đồng bộ với ParkingAgent (Unity 3D) ---
+        # --- Äá»“ng bá»™ vá»›i ParkingAgent (Unity 3D) ---
         self.max_angle_deg = float(self.train_cfg.get("suite_max_angle_deg", 10.0))
         self.max_speed_to_park = float(self.train_cfg.get("suite_max_speed_to_park", 0.3))
         self.hold_decisions = max(1, int(self.train_cfg.get("suite_hold_decisions", 10)))
@@ -176,10 +187,20 @@ class ParkingEnv(gym.Env):
         self.start_episode_dist = 0.0
 
     # ------------------------------------------------------------------
-    # Dựng world
+    # Curriculum phase 1 (easy)
+    # ------------------------------------------------------------------
+    @property
+    def in_easy_phase(self):
+        """True trong `easy_successes` success Ä‘áº§u: cÃ²n á»Ÿ logic rÃºt gá»n."""
+        if not self.curriculum_easy:
+            return False
+        return self.total_successes < self.easy_successes
+
+    # ------------------------------------------------------------------
+    # Dá»±ng world
     # ------------------------------------------------------------------
     def _build_world(self):
-        """World kiểu cũ (config YAML có world/car/obstacles/slots)."""
+        """World kiá»ƒu cÅ© (config YAML cÃ³ world/car/obstacles/slots)."""
         w = self.config["world"]
         world = World(w["width"], w["height"])
         c = self.config["car"]
@@ -203,9 +224,9 @@ class ParkingEnv(gym.Env):
     # Decoy
     # ------------------------------------------------------------------
     def _spawn_decoy_layout(self):
-        """Đặt `decoy_count` xe vào slot ngẫu nhiên (layout mới).
+        """Äáº·t `decoy_count` xe vÃ o slot ngáº«u nhiÃªn (layout má»›i).
 
-        Layout tất định theo `decoy_seed + layout_index` để tái lập được.
+        Layout táº¥t Ä‘á»‹nh theo `decoy_seed + layout_index` Ä‘á»ƒ tÃ¡i láº­p Ä‘Æ°á»£c.
         """
         self.layout_successes = 0
         self._pending_decoy_spawn = False
@@ -223,7 +244,7 @@ class ParkingEnv(gym.Env):
         decoys = []
         for i in ids:
             slot = self.world.slots[i]
-            # xe decoy đỗ đúng tâm slot, cùng hướng với slot
+            # xe decoy Ä‘á»— Ä‘Ãºng tÃ¢m slot, cÃ¹ng hÆ°á»›ng vá»›i slot
             decoys.append(
                 OBB(slot.cx, slot.cy, self.car.length, self.car.width, slot.theta)
             )
@@ -232,15 +253,15 @@ class ParkingEnv(gym.Env):
         self.decoy_slots = ids
 
     def force_decoy_layout(self):
-        """Đổi layout ngay ở lần reset kế tiếp (dùng cho demo/eval)."""
+        """Äá»•i layout ngay á»Ÿ láº§n reset káº¿ tiáº¿p (dÃ¹ng cho demo/eval)."""
         self._pending_decoy_spawn = True
 
     def _on_success(self, info):
-        """Cộng success và xét 3 mốc curriculum.
+        """Cá»™ng success vÃ  xÃ©t 3 má»‘c curriculum.
 
-        - `spawn_change_every` (20): đổi nhẹ spawn point
-        - `target_change_every` (60): đổi chỗ đỗ (cùng hướng)
-        - `decoy_change_every` (180): reset toàn bộ + reset cả 3 bộ đếm
+        - `spawn_change_every` (20): Ä‘á»•i nháº¹ spawn point
+        - `target_change_every` (60): Ä‘á»•i chá»— Ä‘á»— (cÃ¹ng hÆ°á»›ng)
+        - `decoy_change_every` (180): reset toÃ n bá»™ + reset cáº£ 3 bá»™ Ä‘áº¿m
         """
         self.total_successes += 1
         self.layout_successes += 1
@@ -248,7 +269,7 @@ class ParkingEnv(gym.Env):
         self.target_successes += 1
         self.decoy_successes += 1
 
-        # 180: reset toàn bộ (decoy + spawn + target + 3 bộ đếm)
+        # 180: reset toÃ n bá»™ (decoy + spawn + target + 3 bá»™ Ä‘áº¿m)
         if self.decoy_successes >= self.decoy_change_every:
             info["decoy_event"] = "respawn"
             info["completed_successes"] = self.decoy_successes
@@ -272,16 +293,16 @@ class ParkingEnv(gym.Env):
         info["spawn_shift_px"] = self.spawn_shift_px
 
     # ------------------------------------------------------------------
-    # Quan sát / reset
+    # Quan sÃ¡t / reset
     # ------------------------------------------------------------------
     def _sensors(self):
         return sense_all(self.world, self.car, max_range=self.sensor_range)
 
     def _slot_axes(self, slot):
-        """Trục dài / trục ngắn của slot.
+        """Trá»¥c dÃ i / trá»¥c ngáº¯n cá»§a slot.
 
-        OBB góc `theta`: cạnh `w` nằm dọc trục (cos theta, sin theta).
-        Nếu w < h thì cạnh dài thực chất là trục pháp tuyến (như slot 44x56).
+        OBB gÃ³c `theta`: cáº¡nh `w` náº±m dá»c trá»¥c (cos theta, sin theta).
+        Náº¿u w < h thÃ¬ cáº¡nh dÃ i thá»±c cháº¥t lÃ  trá»¥c phÃ¡p tuyáº¿n (nhÆ° slot 44x56).
         """
         ex = (math.cos(slot.theta), math.sin(slot.theta))
         ey = (-math.sin(slot.theta), math.cos(slot.theta))
@@ -290,7 +311,7 @@ class ParkingEnv(gym.Env):
         return ey, ex
 
     def _angle_to_axis(self, slot):
-        """Lệch giữa mũi xe và trục dài slot, -90..90 độ (tiến/lùi như nhau)."""
+        """Lá»‡ch giá»¯a mÅ©i xe vÃ  trá»¥c dÃ i slot, -90..90 Ä‘á»™ (tiáº¿n/lÃ¹i nhÆ° nhau)."""
         long_axis, _ = self._slot_axes(slot)
         fx, fy = math.cos(self.car.theta), math.sin(self.car.theta)
         ang = math.degrees(
@@ -304,7 +325,7 @@ class ParkingEnv(gym.Env):
         return ang
 
     def _slot_contains(self, obb, point):
-        """Điểm có nằm trong OBB slot không."""
+        """Äiá»ƒm cÃ³ náº±m trong OBB slot khÃ´ng."""
         c, s = math.cos(-obb.theta), math.sin(-obb.theta)
         dx, dy = point[0] - obb.cx, point[1] - obb.cy
         lx = c * dx - s * dy
@@ -312,7 +333,7 @@ class ParkingEnv(gym.Env):
         return abs(lx) <= obb.w / 2.0 and abs(ly) <= obb.h / 2.0
 
     def _is_parked(self, slot):
-        """Điều kiện đỗ giống ParkingAgent: góc, vận tốc, cả 4 góc xe trong slot."""
+        """Äiá»u kiá»‡n Ä‘á»— giá»‘ng ParkingAgent: gÃ³c, váº­n tá»‘c, cáº£ 4 gÃ³c xe trong slot."""
         if abs(self._angle_to_axis(slot)) > self.max_angle_deg:
             return False
         if abs(self.car.v) > self.max_speed_to_park:
@@ -320,10 +341,10 @@ class ParkingEnv(gym.Env):
         return all(self._slot_contains(slot, p) for p in self.car.obb().corners())
 
     # ------------------------------------------------------------------
-    # Test helper: dựng trạng thái "đỗ chuẩn" (dùng trong test, không ảnh hưởng train)
+    # Test helper: dá»±ng tráº¡ng thÃ¡i "Ä‘á»— chuáº©n" (dÃ¹ng trong test, khÃ´ng áº£nh hÆ°á»Ÿng train)
     # ------------------------------------------------------------------
     def place_parked(self):
-        """Đặt xe đúng tâm slot đích, đúng hướng, đứng yên."""
+        """Äáº·t xe Ä‘Ãºng tÃ¢m slot Ä‘Ã­ch, Ä‘Ãºng hÆ°á»›ng, Ä‘á»©ng yÃªn."""
         slot = self.world.slots[self.target_index]
         long_axis, _ = self._slot_axes(slot)
         theta = math.atan2(long_axis[1], long_axis[0])
@@ -340,7 +361,7 @@ class ParkingEnv(gym.Env):
         sensor_vals = []
         for name in self.SENSOR_ORDER:
             dist = sensors[name][0]
-            # Gần vật cản → gần 1; trống → gần 0
+            # Gáº§n váº­t cáº£n â†’ gáº§n 1; trá»‘ng â†’ gáº§n 0
             sensor_vals.append(
                 1.0 - min(dist, self.sensor_range) / self.sensor_range
             )
@@ -357,17 +378,17 @@ class ParkingEnv(gym.Env):
         dist = math.hypot(dx, dy)
         ang = math.atan2(ly, lx)
 
-        # --- Obs bổ sung để bám sát 3D ---
+        # --- Obs bá»• sung Ä‘á»ƒ bÃ¡m sÃ¡t 3D ---
         c_s, s_s = math.cos(-slot.theta), math.sin(-slot.theta)
-        local_x = c_s * dx - s_s * dy      # vị trí xe trong hệ slot
+        local_x = c_s * dx - s_s * dy      # vá»‹ trÃ­ xe trong há»‡ slot
         local_y = s_s * dx + c_s * dy
 
-        # hướng mũi xe trong hệ slot: (cos, sin) của (theta - slot.theta)
+        # hÆ°á»›ng mÅ©i xe trong há»‡ slot: (cos, sin) cá»§a (theta - slot.theta)
         theta_rel = car.theta - slot.theta
         fwd_slot_x = math.cos(theta_rel)
         fwd_slot_y = math.sin(theta_rel)
 
-        # tâm slot trong hệ xe (lấy từ slot ngược sang xe)
+        # tÃ¢m slot trong há»‡ xe (láº¥y tá»« slot ngÆ°á»£c sang xe)
         to_slot_x = c * dx - s * dy
         to_slot_y = s * dx + c * dy
 
@@ -377,7 +398,7 @@ class ParkingEnv(gym.Env):
             math.cos(ang),
             math.sin(ang),
             min(1.0, dist / self.obs_dist_scale),
-            # 3D parity (5 chiều)
+            # 3D parity (5 chiá»u)
             local_x / self.obs_scale,
             local_y / self.obs_scale,
             fwd_slot_x,
@@ -390,7 +411,7 @@ class ParkingEnv(gym.Env):
     # Spawn point
     # ------------------------------------------------------------------
     def _world_cell(self, x, y):
-        """(row, col) của ô chứa điểm, None nếu ngoài map."""
+        """(row, col) cá»§a Ã´ chá»©a Ä‘iá»ƒm, None náº¿u ngoÃ i map."""
         ts = getattr(self.world, "cell_size", None)
         if not ts:
             return None
@@ -399,7 +420,7 @@ class ParkingEnv(gym.Env):
         return r, c
 
     def _cell_is_road(self, row, col):
-        """Ô có phải đường (tile 'R') và không bị decoy chiếm."""
+        """Ã” cÃ³ pháº£i Ä‘Æ°á»ng (tile 'R') vÃ  khÃ´ng bá»‹ decoy chiáº¿m."""
         if row is None or col is None:
             return False
         layout = getattr(self.world, "tiles_raw", None) or []
@@ -416,11 +437,11 @@ class ParkingEnv(gym.Env):
         )
 
     def _draw_car_pose(self):
-        """Random 1 pose xuất phát quanh gốc, vẫn nằm trên đường (tile R).
+        """Random 1 pose xuáº¥t phÃ¡t quanh gá»‘c, váº«n náº±m trÃªn Ä‘Æ°á»ng (tile R).
 
-        Mức trượt tăng dần theo số mốc đã qua trong chu kỳ 180:
-          0 mốc  -> jitter nhỏ quanh gốc
-          >=1    -> trượt ngẫu nhiên trong ±spawn_shift_px quanh gốc
+        Má»©c trÆ°á»£t tÄƒng dáº§n theo sá»‘ má»‘c Ä‘Ã£ qua trong chu ká»³ 180:
+          0 má»‘c  -> jitter nhá» quanh gá»‘c
+          >=1    -> trÆ°á»£t ngáº«u nhiÃªn trong Â±spawn_shift_px quanh gá»‘c
         """
         base_x, base_y, base_theta = (
             self.spawn_base_pose or self.start_pose
@@ -431,7 +452,7 @@ class ParkingEnv(gym.Env):
 
         for i in range(40):
             if shifted:
-                # trượt ±spawn_shift_px quanh vị trí spawn gốc của layout
+                # trÆ°á»£t Â±spawn_shift_px quanh vá»‹ trÃ­ spawn gá»‘c cá»§a layout
                 x = base_x + float(self.np_random.uniform(-shift, shift))
                 y = base_y + float(self.np_random.uniform(-shift, shift))
             else:
@@ -446,12 +467,12 @@ class ParkingEnv(gym.Env):
             self.car.commit((x, y, theta, 0.0, 0.0))
             if not self.world.car_collides(self.car.obb()):
                 return (x, y, theta)
-        # fallback: đúng vị trí gốc
+        # fallback: Ä‘Ãºng vá»‹ trÃ­ gá»‘c
         self.car.commit((base_x, base_y, base_theta, 0.0, 0.0))
         return (base_x, base_y, base_theta)
 
     def _spawn_car(self):
-        """Đặt xe vào pose đã khoá của stage; chỉ random lại khi có reset"""
+        """Äáº·t xe vÃ o pose Ä‘Ã£ khoÃ¡ cá»§a stage; chá»‰ random láº¡i khi cÃ³ reset"""
         if self._locked_car_pose is None:
             self._locked_car_pose = self._draw_car_pose()
         x, y, theta = self._locked_car_pose
@@ -472,7 +493,7 @@ class ParkingEnv(gym.Env):
             if self.layout_target_index is not None
             else self._locked_target_index
         )
-        # Mốc 60: ưu tiên slot khác target gốc của layout -> thấy khác biệt rõ
+        # Má»‘c 60: Æ°u tiÃªn slot khÃ¡c target gá»‘c cá»§a layout -> tháº¥y khÃ¡c biá»‡t rÃµ
         if len(free) > 1 and base is not None:
             choices = [i for i in free if i != base]
             if choices:
@@ -480,7 +501,7 @@ class ParkingEnv(gym.Env):
         return int(free[int(self.np_random.integers(len(free)))])
 
     def _lock_target_slot(self):
-        """Chốt target cho layout hiện tại; chỉ đổi khi tới mốc 60 hoặc 180."""
+        """Chá»‘t target cho layout hiá»‡n táº¡i; chá»‰ Ä‘á»•i khi tá»›i má»‘c 60 hoáº·c 180."""
         if (
             self._locked_target_index is None
             or self._locked_target_index in self.decoy_slots
@@ -490,10 +511,10 @@ class ParkingEnv(gym.Env):
         return self._locked_target_index
 
     def _reset_layout(self):
-        """Random lại toàn bộ layout (decoy + spawn point + target).
+        """Random láº¡i toÃ n bá»™ layout (decoy + spawn point + target).
 
-        Lần init đầu tiên dùng `decoy_first_count` (mặc định 0 = bãi trống),
-        các lần sau dùng `decoy_count`.
+        Láº§n init Ä‘áº§u tiÃªn dÃ¹ng `decoy_first_count` (máº·c Ä‘á»‹nh 0 = bÃ£i trá»‘ng),
+        cÃ¡c láº§n sau dÃ¹ng `decoy_count`.
         """
         self._locked_car_pose = None
         self._locked_target_index = None
@@ -525,7 +546,7 @@ class ParkingEnv(gym.Env):
         decoys = []
         for i in ids:
             slot = self.world.slots[i]
-            # xe decoy đỗ đúng tâm slot, cùng hướng với slot
+            # xe decoy Ä‘á»— Ä‘Ãºng tÃ¢m slot, cÃ¹ng hÆ°á»›ng vá»›i slot
             decoys.append(
                 OBB(slot.cx, slot.cy, self.car.length, self.car.width, slot.theta)
             )
@@ -535,9 +556,9 @@ class ParkingEnv(gym.Env):
         self.decoy_spawned = True
 
     def _advance_stages(self, last_step=False):
-        """Đổi stage. Gọi từ reset(), hoặc khi một stage kéo quá lâu.
+        """Äá»•i stage. Gá»i tá»« reset(), hoáº·c khi má»™t stage kÃ©o quÃ¡ lÃ¢u.
 
-        Trả list sự kiện: "spawn" | "target" | "decoy".
+        Tráº£ list sá»± kiá»‡n: "spawn" | "target" | "decoy".
         """
         events = []
         if self._pending_decoy_spawn:
@@ -550,7 +571,7 @@ class ParkingEnv(gym.Env):
             self.stage_start_episode = self.episode_index
             return events
 
-        # Target: đổi theo mốc tuyệt đối trong chu kỳ 180
+        # Target: Ä‘á»•i theo má»‘c tuyá»‡t Ä‘á»‘i trong chu ká»³ 180
         if self.target_successes >= self.target_change_every:
             self.target_successes = 0
             self._locked_target_index = None
@@ -558,7 +579,7 @@ class ParkingEnv(gym.Env):
             self.stage_start_episode = self.episode_index
             events.append("target")
 
-        # Spawn: mỗi `spawn_change_every` success
+        # Spawn: má»—i `spawn_change_every` success
         if self.spawn_successes >= self.spawn_change_every:
             self.spawn_successes = 0
             self.spawn_level += 1
@@ -569,13 +590,13 @@ class ParkingEnv(gym.Env):
         return events
 
     def _force_stage_advance(self):
-        """Kẹt quá `max_episodes_per_stage` -> buộc tiến stage gần nhất."""
+        """Káº¹t quÃ¡ `max_episodes_per_stage` -> buá»™c tiáº¿n stage gáº§n nháº¥t."""
         if not self.max_episodes_per_stage:
             return []
         if self.episode_index - self.stage_start_episode < self.max_episodes_per_stage:
             return []
 
-        # Chọn mốc chưa đạt có ngưỡng nhỏ nhất
+        # Chá»n má»‘c chÆ°a Ä‘áº¡t cÃ³ ngÆ°á»¡ng nhá» nháº¥t
         pending = []
         if self.spawn_successes < self.spawn_change_every:
             pending.append(("spawn", self.spawn_successes, self.spawn_change_every))
@@ -599,7 +620,7 @@ class ParkingEnv(gym.Env):
         super().reset(seed=seed)
         self.episode_index += 1
 
-        # Buộc đổi stage nếu agent kẹt quá lâu ở stage hiện tại
+        # Buá»™c Ä‘á»•i stage náº¿u agent káº¹t quÃ¡ lÃ¢u á»Ÿ stage hiá»‡n táº¡i
         forced = self._force_stage_advance()
 
         if self._pending_decoy_spawn or (self.decoy_on_reset and self.layout_index == 0):
@@ -639,10 +660,10 @@ class ParkingEnv(gym.Env):
     # Step
     # ------------------------------------------------------------------
     def _parse_action(self, action):
-        """Chuẩn hoá action về (throttle, steer, brake) trong [-1, 1].
+        """Chuáº©n hoÃ¡ action vá» (throttle, steer, brake) trong [-1, 1].
 
-        - Box(3,):  [ga/lùi, lái, phanh] như ParkingAgent 3D.
-        - Số nguyên: vẫn chấp nhận bảng 6 action cũ (chỉ để test/eval).
+        - Box(3,):  [ga/lÃ¹i, lÃ¡i, phanh] nhÆ° ParkingAgent 3D.
+        - Sá»‘ nguyÃªn: váº«n cháº¥p nháº­n báº£ng 6 action cÅ© (chá»‰ Ä‘á»ƒ test/eval).
         """
         if np.isscalar(action) or np.ndim(action) == 0:
             throttle_dir, steer_dir = self._actions[int(action)]
@@ -657,9 +678,9 @@ class ParkingEnv(gym.Env):
         return throttle, steer, brake
 
     def _kinematic_step(self, throttle, steer, brake, dt):
-        """Một bước động học kiểu CarController: gia tốc + chống đảo chiều.
+        """Má»™t bÆ°á»›c Ä‘á»™ng há»c kiá»ƒu CarController: gia tá»‘c + chá»‘ng Ä‘áº£o chiá»u.
 
-        Trả list trạng thái con (đã commit vào self.car).
+        Tráº£ list tráº¡ng thÃ¡i con (Ä‘Ã£ commit vÃ o self.car).
         """
         car = self.car
         n_sub = 3
@@ -670,13 +691,13 @@ class ParkingEnv(gym.Env):
                 car.v = 0.0
                 break
 
-            # --- Lái: tốc độ đánh lái giới hạn (steer_rate) ---
+            # --- LÃ¡i: tá»‘c Ä‘á»™ Ä‘Ã¡nh lÃ¡i giá»›i háº¡n (steer_rate) ---
             target_steer = steer * car.max_steer
             diff = target_steer - car.steer
             step = car.steer_rate * sub_dt
             new_steer = car.steer + max(-step, min(step, diff))
 
-            # --- Ga / phanh / trôi ---
+            # --- Ga / phanh / trÃ´i ---
             new_v = car.v
             engine = throttle > 0.0
             braking = brake > 0.0 and new_v != 0.0
@@ -689,7 +710,7 @@ class ParkingEnv(gym.Env):
                 if engine:
                     new_v += car.accel * abs(throttle) * sub_dt
                 else:
-                    # Lùi: phải phanh về 0 trước, chưa đảo chiều ngay
+                    # LÃ¹i: pháº£i phanh vá» 0 trÆ°á»›c, chÆ°a Ä‘áº£o chiá»u ngay
                     if car.v > 0.0:
                         new_v -= self.brake_decel * sub_dt
                         if new_v < 0.0:
@@ -697,7 +718,7 @@ class ParkingEnv(gym.Env):
                     else:
                         new_v -= car.accel * abs(throttle) * sub_dt
             else:
-                # Nhả ga: xe trôi, giảm dần theo decel
+                # Nháº£ ga: xe trÃ´i, giáº£m dáº§n theo decel
                 if new_v > 0.0:
                     new_v = max(0.0, new_v - car.decel * sub_dt)
                 elif new_v < 0.0:
@@ -714,7 +735,7 @@ class ParkingEnv(gym.Env):
         return states
 
     def _direct_step(self, throttle_dir, steer_dir, dt):
-        """Động học cũ: ga/lái tức thời (giữ cho tương thích ngược)."""
+        """Äá»™ng há»c cÅ©: ga/lÃ¡i tá»©c thá»i (giá»¯ cho tÆ°Æ¡ng thÃ­ch ngÆ°á»£c)."""
         car = self.car
         n_sub = 3
         sub_dt = dt / n_sub
@@ -771,8 +792,8 @@ class ParkingEnv(gym.Env):
         dist = math.hypot(slot.cx - self.car.x, slot.cy - self.car.y)
         align = 1.0 - abs(self._angle_to_axis(slot)) / 90.0
 
-        # Va chạm: bỏ thưởng progress để agent không được "thưởng" khi lao vào
-        # vật cản ở gần đích.
+        # Va cháº¡m: bá» thÆ°á»Ÿng progress Ä‘á»ƒ agent khÃ´ng Ä‘Æ°á»£c "thÆ°á»Ÿng" khi lao vÃ o
+        # váº­t cáº£n á»Ÿ gáº§n Ä‘Ã­ch.
         if collided:
             progress = 0.0
         else:
@@ -808,7 +829,7 @@ class ParkingEnv(gym.Env):
         if collided:
             kinds = sorted({h["kind"] for h in hits})
             penalties = [self.collision_rewards.get(k, self.collision_reward) for k in kinds]
-            # Chạm nhiều loại cùng lúc: dùng mức phạt nặng nhất, không cộng dồn
+            # Cháº¡m nhiá»u loáº¡i cÃ¹ng lÃºc: dÃ¹ng má»©c pháº¡t náº·ng nháº¥t, khÃ´ng cá»™ng dá»“n
             total = min(penalties)
             reward += total
             info["is_collision"] = True
@@ -817,31 +838,53 @@ class ParkingEnv(gym.Env):
             if self.terminate_on_collision:
                 terminated = True
 
-        # 3D parity: đi quá xa slot (maxDistance) -> fail. 0 = tắt.
-        if not terminated and self.max_distance > 0 and dist > self.max_distance:
+        # 3D parity: Ä‘i quÃ¡ xa slot (maxDistance) -> fail. 0 = táº¯t.
+        # Phase 1 ("easy") chÆ°a Ã¡p dá»¥ng Ä‘á»ƒ agent táº­p trung há»c Ä‘Æ°á»ng Ä‘i.
+        if (
+            not terminated
+            and not self.in_easy_phase
+            and self.max_distance > 0
+            and dist > self.max_distance
+        ):
             reward += self.collision_reward
             terminated = True
             info["is_collision"] = True
             info["collision_kinds"] = ["far_from_slot"]
 
         if not terminated:
-            if self.use_suite_parked:
-                parked = self._is_parked(slot)
-            else:
-                parked = dist < self.success_dist and dtheta < self.success_theta
-
-            info["is_parked"] = bool(parked)
-            if parked:
-                # 3D parity: phải giữ trạng thái đỗ đủ hold_decisions bước
-                self.parked_count += 1
-                if self.parked_count >= self.hold_decisions:
+            if self.in_easy_phase:
+                # --- Phase 1 (easy): logic rut gon, khong can hold ---
+                parked = (
+                    dist < self.easy_success_dist
+                    and abs(self._angle_to_axis(slot)) < self.easy_success_theta_deg
+                )
+                info['is_parked'] = bool(parked)
+                if parked:
                     reward += self.success_reward
                     terminated = True
-                    info["is_success"] = True
+                    info['is_success'] = True
                     self._on_success(info)
+                info['parked_count'] = 0
             else:
-                self.parked_count = 0
-            info["parked_count"] = self.parked_count
+                # --- Phase 2: logic 3D day du (giu nguyen HEAD) ---
+                if self.use_suite_parked:
+                    parked = self._is_parked(slot)
+                else:
+                    parked = dist < self.success_dist and dtheta < self.success_theta
+
+                info['is_parked'] = bool(parked)
+                if parked:
+                    self.parked_count += 1
+                    if self.parked_count >= self.hold_decisions:
+                        reward += self.success_reward
+                        terminated = True
+                        info['is_success'] = True
+                        self._on_success(info)
+                else:
+                    self.parked_count = 0
+                info['parked_count'] = self.parked_count
+
+        info['easy_phase'] = self.in_easy_phase
 
         if self.step_count >= self.max_steps:
             truncated = True
