@@ -26,6 +26,16 @@ DEFAULT_TRAINING = {
     "success_theta_deg": 20.0,
     "sensor_range": 150.0,
     "obs_dist_scale": 890.0,
+    # Reward va chạm chung + theo từng loại tile/object
+    "collision_reward": -10.0,
+    "collision_rewards": {
+        "tile:G": -10.0,     # planting
+        "tile:H": -10.0,     # sidewalk
+        "object:B": -6.0,    # bush
+        "object:L": -6.0,    # lamp
+        "decoy": -10.0,
+    },
+    "terminate_on_collision": True,
     "start_jitter": [3.0, 3.0, 0.2],
     "max_speed_fwd": 60.0,
     "max_speed_rev": 30.0,
@@ -87,17 +97,20 @@ def build_map_spec(map_config, map_data, training=None):
     object_legend = map_config["legend"]["objects"]
 
     layout = []
+    layout_codes = []
     slots = []
     obstacles = []
 
     for r, row in enumerate(tiles):
         line = []
+        run_codes = []
         for c, ch in enumerate(row):
             if ch not in tile_legend:
                 raise ValueError(f"Tile '{ch}' tại ({r},{c}) không có trong legend")
             spec = tile_legend[ch]
             walkable = bool(spec.get("walkable", True))
             line.append("." if walkable else "#")
+            run_codes.append("." if walkable else ch)
 
             cx = c * ts + ts / 2.0
             cy = r * ts + ts / 2.0
@@ -126,6 +139,8 @@ def build_map_spec(map_config, map_data, training=None):
                     obstacles.append(
                         {
                             "type": ospec.get("name", obj_ch),
+                            "code": obj_ch,
+                            "kind": f"object:{obj_ch}",
                             "cx": cx,
                             "cy": cy,
                             "w": obj_size,
@@ -133,7 +148,9 @@ def build_map_spec(map_config, map_data, training=None):
                         }
                     )
         layout.append("".join(line))
-
+        row_codes = []
+        row_codes.append("".join(run_codes))
+        layout_codes.append("".join(row_codes))
     agent = map_config.get("agent") or {}
     length = float(agent.get("length", 18.4))
     width = float(agent.get("width", 43.6))
@@ -163,6 +180,7 @@ def build_map_spec(map_config, map_data, training=None):
         "name": map_data.get("name", "map"),
         "grid": {"cols": cols, "rows": rows, "cell_size": ts},
         "layout": layout,
+        "layout_codes": layout_codes,
         "obstacles": obstacles,
         "slots": slots,
         "tiles_raw": tiles,

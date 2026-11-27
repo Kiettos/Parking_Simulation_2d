@@ -95,8 +95,27 @@ class ParkingEnv(gym.Env):
             (-1, -1), (-1, 0), (-1, 1),
         ]
 
-        self.step_count = 0
-        self.prev_dist = 0.0
+        self.step_penalty = float(self.train_cfg.get("step_penalty", -0.02))
+
+        # --- Reward khi va chạm, riêng cho từng loại tile / object ---
+        self.collision_reward = float(self.train_cfg.get("collision_reward", -10.0))
+        default_kind = {
+            "wall": self.collision_reward,
+            "tile:G": -10.0,        # planting
+            "tile:H": -10.0,        # sidewalk
+            "object:B": -6.0,       # bush
+            "object:L": -6.0,       # lamp
+            "decoy": -10.0,
+            "obstacle": self.collision_reward,
+            "boundary": self.collision_reward,
+        }
+        default_kind.update(
+            {str(k): float(v) for k, v in self.train_cfg.get("collision_rewards", {}).items()}
+        )
+        self.collision_rewards = default_kind
+        self.terminate_on_collision = bool(
+            self.train_cfg.get("terminate_on_collision", True)
+        )
 
     # ------------------------------------------------------------------
     # Dựng world
@@ -331,7 +350,7 @@ class ParkingEnv(gym.Env):
         # Chia nhỏ bước để tránh xuyên vật cản
         n_sub = 3
         sub_dt = self.dt / n_sub
-        collided = False
+        hits = []
         for _ in range(n_sub):
             v = throttle_dir * self.car.max_speed_fwd * 0.5
             steer = steer_dir * self.car.max_steer
@@ -341,10 +360,11 @@ class ParkingEnv(gym.Env):
             self.car.y += v * math.sin(self.car.theta) * sub_dt
             self.car.v = v
             self.car.steer = steer
-            if self.world.car_collides(self.car.obb()):
-                collided = True
+            hits = self.world.collisions(self.car.obb())
+            if hits:
                 break
 
+        collided = bool(hits)
         if collided:
             self.car.commit(old)
             self.car.v = 0.0
@@ -353,14 +373,18 @@ class ParkingEnv(gym.Env):
 
         slot = self.world.slots[self.target_index]
         dist = math.hypot(slot.cx - self.car.x, slot.cy - self.car.y)
+
+        # Va chạm: bỏ thưởng progress để agent không được "thưởng" khi lao vào
+        # vật cản ở gần đích.
+        progress = 0.0 if collided else 0.05 * (self.prev_dist - dist)
+        self.prev_dist = dist
+
         dtheta = abs(
             ((self.car.theta - slot.theta + math.pi) % (2 * math.pi)) - math.pi
         )
 
         # Reward shaping
-        reward = -0.02                                    # step penalty
-        reward += 0.05 * (self.prev_dist - dist)          # progress
-        self.prev_dist = dist
+        reward = self.step_penalty + progress
 
         terminated = False
         truncated = False
@@ -373,12 +397,21 @@ class ParkingEnv(gym.Env):
             "total_successes": self.total_successes,
             "is_success": False,
             "is_collision": False,
+            "collision_kinds": [],
+            "collision_reward": 0.0,
         }
 
         if collided:
-            reward -= 10.0
-            terminated = True
+            kinds = sorted({h["kind"] for h in hits})
+            penalties = [self.collision_rewards.get(k, self.collision_reward) for k in kinds]
+            # Chạm nhiều loại cùng lúc: dùng mức phạt nặng nhất, không cộng dồn
+            total = min(penalties)
+            reward += total
             info["is_collision"] = True
+            info["collision_kinds"] = kinds
+            info["collision_reward"] = total
+            if self.terminate_on_collision:
+                terminated = True
 
         if dist < self.success_dist and dtheta < self.success_theta and not collided:
             reward += 200.0

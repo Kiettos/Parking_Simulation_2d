@@ -87,8 +87,11 @@ def validate_map(spec):
         raise ValueError(f"car thiếu {sorted(missing)}")
 
 
-def _add_walls(world, layout, cell):
-    """Gộp ô '#' thành các OBB chữ nhật (ngang + dọc)."""
+def _add_walls(world, layout, cell, codes=None):
+    """Gộp ô '#' thành các OBB chữ nhật (ngang + dọc).
+
+    `codes` (tuỳ chọn): lưới ký tự tile gốc để gắn kind="tile:<code>".
+    """
     rows, cols = len(layout), len(layout[0])
 
     runs = []
@@ -118,7 +121,11 @@ def _add_walls(world, layout, cell):
         h = r2 - r + 1
         cx = c0 * cell + n * cell / 2.0
         cy = r * cell + h * cell / 2.0
-        world.add_wall(OBB(cx, cy, n * cell, h * cell, 0.0))
+        kind = "wall"
+        if codes and r < len(codes) and c0 < len(codes[r]):
+            code = codes[r][c0]
+            kind = "wall" if code == "#" else f"tile:{code}"
+        world.add_wall(OBB(cx, cy, n * cell, h * cell, 0.0), kind)
 
 
 def world_from_map(spec):
@@ -154,7 +161,7 @@ def world_from_map(spec):
 
     layout = spec.get("layout")
     if layout:
-        _add_walls(world, layout, cell)
+        _add_walls(world, layout, cell, spec.get("layout_codes"))
 
     for o in spec.get("obstacles", []):
         cx = o.get("cx")
@@ -164,7 +171,8 @@ def world_from_map(spec):
             cx = float(o.get("x", 0.0)) + float(o["w"]) / 2.0
             cy = float(o.get("y", 0.0)) + float(o["h"]) / 2.0
         world.add_obstacle(
-            OBB(cx, cy, o["w"], o["h"], o.get("theta", 0.0))
+            OBB(cx, cy, o["w"], o["h"], o.get("theta", 0.0)),
+            o.get("kind", "obstacle"),
         )
     for s in spec["slots"]:
         world.add_slot(

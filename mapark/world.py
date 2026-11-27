@@ -26,13 +26,21 @@ class World:
         # Slot đang được chọn làm đích (cho render)
         self.target_index = 0
 
-    def add_obstacle(self, obb):
+        # Nhãn loại vật cản: id(obb) -> "wall" | "tile:<name>" | "object:<name>" | "decoy"
+        self.obstacle_kinds = {}
+
+    # ------------------------------------------------------------------
+    # Thêm vật cản
+    # ------------------------------------------------------------------
+    def add_obstacle(self, obb, kind="obstacle"):
+        obb.kind = kind
+        self.obstacle_kinds[id(obb)] = kind
         self.static_obstacles.append(obb)
         self.obstacles.append(obb)
 
-    def add_wall(self, obb):
+    def add_wall(self, obb, kind="wall"):
         self.walls.append(obb)
-        self.add_obstacle(obb)
+        self.add_obstacle(obb, kind)
 
     def add_slot(self, obb):
         self.slots.append(obb)
@@ -40,8 +48,17 @@ class World:
     def set_decoys(self, decoys):
         """Thay toàn bộ xe decoy; rebuild danh sách vật cản."""
         self.decoys = list(decoys)
+        for d in self.decoys:
+            d.kind = "decoy"
+            self.obstacle_kinds[id(d)] = "decoy"
         self.decoy_slots = []
         self.obstacles = self.static_obstacles + self.decoys
+
+    # ------------------------------------------------------------------
+    # Truy vấn
+    # ------------------------------------------------------------------
+    def kind_of(self, obb):
+        return getattr(obb, "kind", self.obstacle_kinds.get(id(obb), "obstacle"))
 
     def free_slot_indices(self):
         """Các slot không bị xe decoy chiếm."""
@@ -51,14 +68,28 @@ class World:
                 free.append(i)
         return free
 
-    def car_collides(self, obb):
-        for c in obb.corners():
-            if c[0] < 0 or c[0] > self.width or c[1] < 0 or c[1] > self.height:
-                return True
+    def collisions(self, obb):
+        """Trả list các vật cản mà `obb` chạm vào (kèm loại).
+
+        Phần tử: {"kind": "wall"|"tile:C"|"object:B"|"decoy", "obb": obb}
+        """
+        hits = []
+        for corner in obb.corners():
+            if (
+                corner[0] < 0
+                or corner[0] > self.width
+                or corner[1] < 0
+                or corner[1] > self.height
+            ):
+                hits.append({"kind": "boundary", "obb": None})
+                break
         for obs in self.obstacles:
             if obb_intersect(obb, obs):
-                return True
-        return False
+                hits.append({"kind": self.kind_of(obs), "obb": obs})
+        return hits
+
+    def car_collides(self, obb):
+        return bool(self.collisions(obb))
 
     def step(self, dt, throttle, steer_input):
         car = self.car
