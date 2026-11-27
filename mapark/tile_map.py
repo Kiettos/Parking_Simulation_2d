@@ -78,8 +78,10 @@ DEFAULT_PPO = {
     "n_steps": 2048,
     "batch_size": 256,
     "n_epochs": 10,
-    "gamma": 0.99,
-    "gae_lambda": 0.95,
+    # Chiet khau nhin xa: episode ~111 buoc (spawn->slot 1000px)
+    # gamma 0.995 -> 111 buoc con 0.57 (0.99 chi con 0.33)
+    "gamma": 0.995,
+    "gae_lambda": 0.98,
     "clip_range": 0.2,
     "ent_coef": 0.015,
     "net_arch": [64, 64],
